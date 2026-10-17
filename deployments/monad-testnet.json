@@ -1,0 +1,38 @@
+{
+  "formatVersion": 1,
+  "status": "complete",
+  "chainId": 10143,
+  "network": "Monad Testnet",
+  "createdAt": "2026-10-17T07:30:15.421Z",
+  "deployer": "0xb49a5CbB09A8875cd789DDDFfC32fbAE3442Fe48",
+  "resultSigner": "0x5C821ed0eE711B1644Bf27b36B90b4514ef50F8a",
+  "contractName": "RugArena",
+  "sourceName": "src/RugArena.sol",
+  "compiler": "0.8.37+commit.f401782d.Emscripten.clang",
+  "evmVersion": "cancun",
+  "explorerBaseUrl": "https://testnet.monadscan.com",
+  "constructorArgs": [
+    "0x5C821ed0eE711B1644Bf27b36B90b4514ef50F8a",
+    "10000000000000000000",
+    "8000",
+    "5000",
+    "7200"
+  ],
+  "constructorArgumentsEncoded": "0x0000000000000000000000005c821ed0ee711b1644bf27b36b90b4514ef50f8a0000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000000000000000001f4000000000000000000000000000000000000000000000000000000000000013880000000000000000000000000000000000000000000000000000000000001c20",
+  "settings": {
+    "challengeFee": "10000000000000000000",
+    "poolShareBps": "8000",
+    "rewardBps": "5000",
+    "roundDuration": "7200",
+    "seed": "0"
+  },
+  "transactionHash": "0xf1f09c73ec05a8b5d64df2256cdb4c9cd3698503c2543fa75df26dd8d610d69c",
+  "transactionUrl": "https://testnet.monadscan.com/tx/0xf1f09c73ec05a8b5d64df2256cdb4c9cd3698503c2543fa75df26dd8d610d69c",
+  "receiptStatus": "success",
+  "deploymentBlock": "71762027",
+  "gasUsed": "1757703",
+  "address": "0xc998eb98453f4c26Aba98D369E8C3895b8061085",
+  "contractAddress": "0xc998eb98453f4c26Aba98D369E8C3895b8061085",
+  "runtimeCodeHash": "0xb80b9d0a470f922ed5dfc786ffecf2ef73db85769b9fa63331455737426a8a07",
+  "contractUrl": "https://testnet.monadscan.com/address/0xc998eb98453f4c26Aba98D369E8C3895b8061085"
+}

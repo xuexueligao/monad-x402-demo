@@ -146,10 +146,10 @@ export function createChainAdapter(config: ServerConfig): ChainAdapter {
     };
     const initial = nextBlock === undefined;
     if (nextBlock === undefined) nextBlock = config.deploymentBlock ?? (head > 5000n ? head - 5000n : 0n);
-    // Monad RPC providers impose range limits. Keep each eth_getLogs request small.
+    // Monad's public RPC allows at most 100 blocks per inclusive eth_getLogs range.
     let cursor: bigint = nextBlock;
     while (cursor <= head) {
-      const toBlock: bigint = cursor + 999n < head ? cursor + 999n : head;
+      const toBlock: bigint = cursor + 99n < head ? cursor + 99n : head;
       const logs = await client.getLogs({ address: config.contractAddress, fromBlock: cursor, toBlock });
       processLogs(logs, true, initial);
       cursor = toBlock + 1n;

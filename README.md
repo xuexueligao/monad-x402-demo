@@ -10,9 +10,22 @@
 
 Next.js 入口、聊天、大屏、排行榜、真实交易详情；Fastify + Socket.IO 会话与实时广播；实际 Pi Agent Runtime 工具调用；单一 `RugArena.sol` 验签、结算、奖池、统计与领奖；测试、部署脚本与 Docker 配置均在实际工程内。
 
-**尚未部署测试网合约或发布公网服务。** 需要配置独立部署钱包、模型 Key 和公网托管环境。部署后实际地址与浏览器链接保存在 `deployments/monad-testnet.json`，不能用原 x402 付款记录代替新游戏的上链证据。
+**RugArena 已部署到 Monad Testnet，临时 HTTPS 公网入口已验证，真实模型等待本机 Key。** 公开部署清单见 [monad-testnet.json](deployments/monad-testnet.json)。旧 x402 付款和本地链测试均不能代替本游戏的测试网结算证据。
 
-实测结果：合约 **54/54**、后端与 Pi **18/18**、双钱包真实本地链端到端通过、生产构建通过、浏览器 **7 组**检查通过。详细记录见 [验收记录](docs/arena-verification.md)。
+临时演示：[玩家入口](https://dresses-brad-saints-cap.trycloudflare.com/play) · [现场大屏](https://dresses-brad-saints-cap.trycloudflare.com/arena)。2026-10-17 已验证五个页面返回 200、健康检查 `ready`、真实部署交易详情及 WebSocket 快照。该地址依赖本机服务和隧道进程持续运行；固定 Render 托管尚待账户登录，不能将临时地址当作已完成云托管。
+
+| 部署信息 | 实际链上记录 |
+| --- | --- |
+| 合约 | [`0xc998eb98453f4c26Aba98D369E8C3895b8061085`](https://testnet.monadscan.com/address/0xc998eb98453f4c26Aba98D369E8C3895b8061085) |
+| 部署交易 | [`0xf1f09c73…d610d69c`](https://testnet.monadscan.com/tx/0xf1f09c73ec05a8b5d64df2256cdb4c9cd3698503c2543fa75df26dd8d610d69c) |
+| 部署区块 | `71762027`；回执成功，运行时代码与编译产物一致 |
+| 真实挑战结算 | [`0xeb48d858…930ce7b`](https://testnet.monadscan.com/tx/0xeb48d85850521dc9e9a945e71e25605a7737f8d77b038a62f066d8e4e930ce7b)，区块 `71764191`；10 MON 失败挑战，10 积分 |
+| 实际参数 | 每次结算 **10 测试 MON**；80% 入池；胜利领取当前奖池 50%；回合 7200 秒 |
+| 奖池快照 | 实测结算后 8 测试 MON，合约实际余额 10 MON；当前值从链上读取 |
+
+真实结算验收使用 **Pi 本地规则模式**，实际执行五个游戏工具、后端验签和支付；两个实时客户端均收到链上确认，重复挑战被 `ChallengeAlreadySettled` 拒绝。它不代表已验证远程 AI。见 [测试网结算证据](deployments/monad-testnet-smoke.json)。
+
+实测结果：合约 **54/54**、后端与 Pi **20/20**、双钱包真实本地链端到端通过、生产构建通过、浏览器 **7 组**检查通过。后端包含 Monad 公共 RPC 每批最多 100 块的日志扫描回归测试。详细记录见 [验收记录](docs/arena-verification.md)。
 
 旧 x402 和旧金库模块保留，不参与当前游戏路径，没有防火墙双模式入口；旧说明见 [legacy-x402-readme.md](docs/legacy-x402-readme.md)。
 
@@ -122,11 +135,12 @@ npm run deploy:arena
 
 脚本仅允许 10143，先保存广播 hash 再等回执，并核对实际运行时代码、signer、费用和回合。根目录 `deployments/monad-testnet.json` 包含真实 `contractAddress`、`contractUrl`、`transactionHash`、`transactionUrl`、`deploymentBlock`、参数和代码哈希。已有部署 hash 时不重复部署；RPC 超时先检查保存的交易。
 
-将输出写回配置并重启：
+当前部署已经写回本机配置；其他部署环境使用以下公开地址与区块，并注入同一份后端判定密钥：
 
 ```dotenv
-ARENA_CONTRACT_ADDRESS=实际地址
-ARENA_DEPLOYMENT_BLOCK=实际部署区块
+ARENA_CONTRACT_ADDRESS=0xc998eb98453f4c26Aba98D369E8C3895b8061085
+NEXT_PUBLIC_ARENA_CONTRACT_ADDRESS=0xc998eb98453f4c26Aba98D369E8C3895b8061085
+ARENA_DEPLOYMENT_BLOCK=71762027
 AI_API_KEY=你的模型Key
 AI_BASE_URL=https://api.openai.com/v1
 AI_MODEL=gpt-4o-mini
@@ -155,6 +169,18 @@ Pi 的 `Agent.subscribe` 捕获工具开始/结束与自然语言文本增量；
 ## 前后端部署
 
 Next.js 部署到支持 Node 的平台；Fastify 部署到支持持续进程与 WebSocket 的 Node 主机。所有观众连接同一后端实例。不要把 Socket 服务放进短生命周期函数。
+
+### 单服务 Render
+
+仓库提供 [render.yaml](render.yaml)。在 Render 创建 Blueprint 并关联本仓库，即可使用其构建和启动命令运行 Next.js、Fastify 与同域 WebSocket 网关。已填写公开合约地址和部署区块，平台只需安全配置 `ARENA_RESULT_SIGNER_PRIVATE_KEY`、`OPENAI_API_KEY` 两个服务端秘密变量；**不要上传 `.env.arena.local`，不要将部署钱包私钥加入 Web 服务**。本机同样可以在 `npm run build` 后运行 `npm run start:cloud`，默认网关端口 4100；托管平台使用其 `PORT`。
+
+该配置是部署入口，仓库中的配置文件不代表服务已经在 Render 托管。部署完成后核验公网 `/api/health`、玩家页面与大屏，再进行真实钱包结算。无钱包环境时不要声称已完成测试网游戏全流程。
+
+### 临时公网演示
+
+需要立即排练时，可将 HTTPS 隧道指向本机同域网关 `http://localhost:4100`；将实际公开地址配置为 `FRONTEND_URL`、`PUBLIC_JOIN_URL`，并加入 `ARENA_ALLOWED_ORIGINS`，重启服务后再扫码。隧道只在本机服务和隧道进程运行期间可用，地址可能变化，不能当作持续托管。仅公开网关，不公开本机配置、私钥文件或开发工具。
+
+### Docker 或独立 Node 主机
 
 已提供多阶段 Dockerfile 和 Compose。公网设置：
 
@@ -193,7 +219,7 @@ Socket.IO `snapshot` + `game:event`：`eventId,type,timestamp,roundId,payload`�
 
 ## 已知限制
 
-- 仍需独立部署钱包和测试 MON、真实 AI Key、公网主机/域名，才能完成测试网上线验证；没有使用旧项目的钱包擅自部署。
+- 合约已通过专用测试钱包部署，并完成一笔真实 10 MON 失败挑战结算；尚无真实测试网领奖记录。远程模型待 Key，固定托管待 Render 登录，临时公网地址依赖本机持续运行。
 - 会话保存在单实例内存，重启需重开聊天；链上统计与预留奖励不丢失，公域状态可从链恢复。
 - 加入时钱包地址自报，在线钱包数是连接指标，不代表经签名认证的真人数；排行榜以实际链上地址为准。
 - 结算时付费，放弃对话不扣费也不计入链上挑战。服务端签名是可信裁判承诺，不是模型推理的去中心化证明。

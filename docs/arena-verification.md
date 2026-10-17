@@ -1,12 +1,12 @@
 # MONAD RUG ARENA 验收记录
 
-日期：2026-10-17（Asia/Shanghai）。挑战费用默认 **10 测试 MON**。
+日期：2026-10-17（Asia/Shanghai）。挑战费用 **10 测试 MON**，链上参数已读取核验；80% 加入公共奖池，获胜奖励为当前奖池的 50%。
 
 | 检查 | 实测结果 |
 | --- | --- |
 | Solidity 编译 | solc 0.8.37 / Cancun 通过，公开 RugArena ABI 已生成 |
 | 合约测试 | 54 / 54，通过；其中 RugArena 14 项，保留的旧模块 40 项 |
-| 后端与 Pi Agent | 18 / 18，通过；实际订阅工具执行事件并观察到全部五个工具 |
+| 后端与 Pi Agent | 20 / 20，通过；实际订阅工具执行事件并观察到全部五个工具，另含两项 100 块分页回归 |
 | 类型检查 | 前端及 server + Pi 模块严格 TypeScript 检查通过 |
 | 生产构建 | Next.js 16.4.2 构建通过，5 个游戏路由均已生成 |
 | 生产运行 | standalone 前端 3150 + Fastify 后端 4000 可启动 |
@@ -18,18 +18,29 @@
 | Pi 与隐私 | 每挑战独立 Agent；token 错误不能订阅；A 的流式文本不进入 B 的房间或公共大屏 |
 | 工具与输出错误 | 工具错误仍有合理回复；模型故障可重试；JSON 最多修复一次；失败恢复原上下文 |
 | 后端授权与重放 | EIP-712 真实验签；重复结算拒绝；客户端伪造 hash 不能产生链上确认 |
-| Monad RPC | 官方配置核对，实际 eth_chainId 返回 0x279f |
-| 测试网部署 | 未部署；部署预检查明确报告缺少 ARENA_DEPLOYER_PRIVATE_KEY，未广播交易 |
+| Monad RPC | 官方配置核对，实际 eth_chainId 返回 0x279f；从真实部署区块补扫成功，每批最多 100 块 |
+| 测试网部署 | 已部署 RugArena，区块 71762027，部署回执 success；实际运行时代码与编译产物完全一致 |
+| 测试网游戏结算 | 真实 10 MON 失败挑战结算成功，区块 71764191，pool 8 MON / 合约余额 10 MON / 玩家 10 分；Pi 本地规则模式，尚无真实领奖 |
 | 真实远程模型 | 未验证；当前未配置 AI_API_KEY，清楚标注 local-rules，仍经过实际 Pi Runtime 工具执行 |
-| 公网与 Docker 运行 | 已有部署配置与说明，尚无公网托管凭据；本机没有 Docker CLI，未宣称实测容器 |
+| 临时公网 | 五个路由返回 200、健康检查 ready、真实部署交易 API、WebSocket-only 快照验证通过；依赖本机与隧道持续运行 |
+| 固定托管与 Docker | Render 单服务 Blueprint 与同域网关已准备，尚待托管账户登录；未宣称实测容器 |
 
 浏览器验证脚本包含 7 组检查。测试提供者只模拟连接和网络切换，不制造交易或链上确认。链上交易与余额另由真实本地 EVM 实测，明确不当作 Monad Testnet 交易。
 
 可重复证据：
 
+- [公开部署清单](../deployments/monad-testnet.json)：合约地址、部署交易、区块、参数与 runtimeCodeHash，无私钥。
+- [真实测试网结算](../deployments/monad-testnet-smoke.json)：10 MON 结算、真实事件、奖池、积分、双 Socket 确认与重复拒绝。
+- `.local/evidence/arena-testnet-deployment.json`：真实 Monad Testnet 回执、运行时代码匹配与合约参数读回。
+- `.local/evidence/arena-testnet-settlement.json`：实际结算回执与后端验签、链上统计和实时确认检查。
+- `.local/evidence/arena-public-deployment.json`：临时 HTTPS 五页面、真实交易详情及 WebSocket 检查。
 - `.local/evidence/arena-e2e.json`：合约、两钱包、实际回执与奖励余额。
 - `.local/evidence/arena-browser.json`：浏览器检查和运行时错误列表。
 - `.local/evidence/arena-*-desktop.png` / `arena-*-mobile.png`：五页面真实截图。
 - `artifacts/ui/`：补充视觉验收截图。
 
-执行命令参见根 README。当前上线还需填写专用测试网部署钱包、真实模型 Key 与公网域名/主机；部署成功后 `deployments/monad-testnet.json` 才会包含实际地址和交易浏览器链接。
+测试网合约为 [`0xc998eb98453f4c26Aba98D369E8C3895b8061085`](https://testnet.monadscan.com/address/0xc998eb98453f4c26Aba98D369E8C3895b8061085)，部署交易为 [`0xf1f09c73ec05a8b5d64df2256cdb4c9cd3698503c2543fa75df26dd8d610d69c`](https://testnet.monadscan.com/tx/0xf1f09c73ec05a8b5d64df2256cdb4c9cd3698503c2543fa75df26dd8d610d69c)。Gas 使用 1,757,703，实际费用 0.179285706 测试 MON。该交易只证明合约已部署，不代表玩家已经完成收费挑战。
+
+2026-10-17 15:33（Asia/Shanghai）读回公共回合 1 仍为 active，预计 17:30:16 到期；这是一份检查时快照，当前状态应从链上读取。到期或产生赢家后，玩家可通过游戏页面开启新公共回合。
+
+执行命令与 `render.yaml` 单服务部署、`npm run start:cloud` 同域网关及临时 HTTPS 隧道说明参见根 README。模型 Key 与托管变量仅注入服务端，私钥不进入文档、浏览器构建或 Git 仓库。公网地址和 live AI 状态应在成功核验后单独记录。
