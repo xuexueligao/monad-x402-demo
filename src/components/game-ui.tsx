@@ -39,7 +39,15 @@ export function LiveStatus({ connected }: { connected: boolean }) {
 export function ConfigNotice({ state, error }: { state: GameSnapshot | null; error?: string | null }) {
   const issue = error || state?.chainError;
   if (state?.configured && !issue) return null;
-  return <div className="config-notice" role="status"><Shield size={17} /><div><strong>{issue ? '竞技场连接暂不可用' : '等待合约部署'}</strong><span>{issue || '合约连接后即可开启挑战，奖池和排名将从链上实时同步。'}</span></div></div>;
+  const unconfigured = state && !state.contractAddress;
+  const limited = /429|rate.?limit|too many requests|requests?\s+limited|15\s*\/\s*sec/i.test(issue || '');
+  const title = unconfigured ? '竞技场尚未开放' : limited ? '链上查询繁忙，正在重试' : issue ? '竞技场连接中断，正在重试' : '正在连接竞技场';
+  const message = unconfigured
+    ? '游戏合约尚未配置，暂不可开启挑战。已确认的链上记录不受影响。'
+    : issue
+      ? '暂时无法更新奖池与排名，请等待连接恢复后再开始挑战。已确认的链上记录不受影响。'
+      : '正在读取奖池与排名，请稍候。';
+  return <div className="config-notice" role="status"><Shield size={17} /><div><strong>{title}</strong><span>{message}</span></div></div>;
 }
 
 export function DragonStage({ mood = 'happy', speech, size = 'hero', reactionKey }: { mood?: string; speech?: string; size?: 'hero' | 'arena' | 'play'; reactionKey?: string }) {

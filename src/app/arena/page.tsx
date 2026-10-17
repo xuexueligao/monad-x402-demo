@@ -7,6 +7,7 @@ import { Activity, ArrowUpRight, Clock3, Crown, Maximize, ShieldCheck, Sparkles,
 import { ConfigNotice, DragonStage, EventFeed, Header, LiveStatus, PoolReadout } from '@/components/game-ui';
 import { useArena } from '@/lib/arena-context';
 import { mon, shortAddress } from '@/lib/utils';
+import { GAME_RULES } from '../../../shared/config';
 import styles from './arena.module.css';
 
 type Reaction = { key: string; mood: string; speech: string; winner?: string; hash?: string };
@@ -79,16 +80,13 @@ export default function Arena() {
   const isAttacking = !!reaction && ['alert', 'thinking'].includes(reaction.mood);
   const stageStatus = isWinning ? '有玩家成功带走金币！' : roundEnded ? '等待下一公共回合开启' : isAttacking ? '有人正在挑战金库' : '奶龙正在守护金币';
   const statusClass = isWinning ? styles.statusWon : isAttacking ? styles.statusAttack : '';
-  const feedEvents = events.map(event => ({ ...event, payload: Object.fromEntries(Object.entries(event.payload).map(([key, value]) => [key,
-    ['summary', 'response', 'message', 'reason'].includes(key) && typeof value === 'string' ? value.replaceAll('奶龙', '奶龙').replaceAll('奶龙', '奶龙') : value,
-  ])) }));
-
   return <div className={styles.screen}>
-    <Header active="arena" />
+    <Header active="arena" wallet={false} />
     <main className={styles.main}>
       <div className={styles.titlebar}>
-        <div className={styles.heading}><span className={styles.liveBadge}><i />现场大屏</span><h1>全场一起，挑战奶龙。</h1><LiveStatus connected={connected} /></div>
+        <div className={styles.heading}><span className={styles.liveBadge}><Swords size={14} />现场竞技场</span><h1>谁能带走奶龙的金币？</h1></div>
         <div className={styles.controls}>
+          <LiveStatus connected={connected} />
           <button title={sound ? '关闭胜利音效' : '开启胜利音效'} aria-label={sound ? '关闭胜利音效' : '开启胜利音效'} aria-pressed={sound} onClick={() => setSound(!sound)}>{sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
           <button title="全屏大屏" aria-label="全屏大屏" onClick={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => {}); else void document.documentElement.requestFullscreen?.().catch(() => {}); }}><Maximize size={18} /></button>
         </div>
@@ -96,28 +94,29 @@ export default function Arena() {
 
       <div className={styles.layout}>
         <aside className={styles.feedPanel} aria-label="实时公开游戏事件">
-          <div className={styles.panelHeading}><h2>实时动态</h2><span className={styles.liveDot}>{connected ? '实时' : '连接中'}</span></div>
-          <EventFeed events={feedEvents} limit={6} />
-          <div className={styles.feedNote}><ShieldCheck size={13} />链上确认后，战绩才正式生效</div>
+          <div className={styles.panelHeading}><div><span className={styles.panelEyebrow}>金库前线</span><h2>实时战报</h2></div><span className={styles.liveDot}>{connected ? '实时' : '连接中'}</span></div>
+          <EventFeed events={events} limit={5} />
+          <div className={styles.feedNote}><ShieldCheck size={14} /><span>每次出手，都有链上回响。</span></div>
         </aside>
 
         <section className={`${styles.stage} ${isWinning ? styles.celebrating : ''}`} aria-label="共享金库主舞台">
           <div className={styles.pool}>
-            <Crown className={styles.poolCrown} size={40} strokeWidth={1.4} fill="currentColor" />
-            <PoolReadout wei={state?.round.prizePool} large caption="全场奖池" />
-            <div className={styles.roundLabel}><Sparkles size={12} />公共回合 #{state?.round.id || '—'}<span>Monad Testnet</span></div>
+            <div className={styles.roundLabel}><Sparkles size={12} />公共回合 #{state?.round.id || '—'}<span>全场共享金库</span></div>
+            <div className={styles.poolTitle}><Crown className={styles.poolCrown} size={22} strokeWidth={1.4} /><span>{state?.chainError ? '上次确认的公共奖池' : '公共奖池'}</span></div>
+            {state ? <PoolReadout wei={state.round.prizePool} large caption="公共奖池" /> : <div className={styles.poolLoading}>正在清点金币…</div>}
+            <span className={styles.poolRule}>说服奶龙，赢取结算时奖池的 {GAME_RULES.rewardBps / 100}%</span>
           </div>
           <div className={styles.character}>
             <DragonStage size="arena" mood={reaction?.mood || 'happy'} reactionKey={reaction?.key} speech={reaction?.speech || '金币在这里，看你有没有本事带走。'} />
           </div>
           {isWinning && reaction.winner && <div className={styles.winnerBanner} role="status"><Crown size={22} /><div><strong>{shortAddress(reaction.winner)} 夺宝成功</strong><span>奖金已由合约直接发往付款钱包</span></div>{reaction.hash && <Link href={`/tx/${reaction.hash}`} aria-label="查看本次成功发奖交易"><ArrowUpRight size={20} /></Link>}</div>}
           <div className={`${styles.stageStatus} ${statusClass}`}><i />{stageStatus}</div>
-          <div className={styles.roundClock}><Clock3 size={15} /><span>{roundEnded ? '本回合已结束' : '下一公共回合倒计时'}</span><strong>{remaining === null ? '—:—:—' : clock(remaining)}</strong><small>{roundEnded ? '主持人可开启新回合' : '当前回合结束后开放'}</small></div>
+          <div className={styles.roundClock}><Clock3 size={15} /><span>{roundEnded ? '本回合已结束' : '本回合剩余'}</span><strong>{remaining === null ? '—:—:—' : clock(remaining)}</strong>{roundEnded && <Link href="/play">开启新回合 <ArrowUpRight size={12} /></Link>}</div>
         </section>
 
         <aside className={styles.rightWing}>
           <section className={styles.rankingPanel} aria-label="当前前五名玩家">
-            <div className={styles.panelHeading}><h2>排行榜</h2><Link href="/leaderboard" aria-label="查看完整排行榜"><span>查看全部</span><ArrowUpRight size={16} /></Link></div>
+            <div className={styles.panelHeading}><div><span className={styles.panelEyebrow}>金库荣誉榜</span><h2>夺宝高手</h2></div><Link href="/leaderboard" aria-label="查看完整排行榜"><ArrowUpRight size={18} /></Link></div>
             <div className={styles.rankList}>{state?.leaderboard.length ? state.leaderboard.slice(0, 5).map((entry, index) => <div className={styles.rankRow} key={entry.address}>
               <span className={`${styles.rankMedal} ${index < 3 ? styles[`medal${index + 1}`] : ''}`}>{index < 3 ? <Crown size={25} fill="currentColor" strokeWidth={1.2} /> : index + 1}</span>
               <span className={styles.avatar} style={{ backgroundColor: ['#69412f', '#646b59', '#73382f', '#4e6247', '#374b56'][index] }} aria-hidden="true">{entry.address.slice(2, 4).toUpperCase()}</span>
@@ -126,9 +125,9 @@ export default function Arena() {
             </div>) : <div className={styles.emptyRanking}><Crown size={31} /><strong>第一位赢家，会是你吗？</strong><span>完成链上结算，登上排行榜。</span></div>}</div>
           </section>
           <section className={styles.joinPanel} aria-label="扫码加入游戏">
-            <div className={styles.qr}>{state?.joinUrl ? <QRCodeSVG value={state.joinUrl} size={118} bgColor="#ffffff" fgColor="#24251f" level="M" /> : <span>正在获取<br />加入地址</span>}</div>
-            <div className={styles.joinCopy}><strong>下一位赢家，<br />也许就是你。</strong><span>扫码连接自己的钱包</span><Link href="/play">加入挑战 <ArrowUpRight size={15} /></Link></div>
-            <p>{state ? `${mon(state.round.challengeFee, 0)} MON 入场` : '等待游戏配置'}<span>最多 3 条对话 · 成功自动到账</span></p>
+            <div className={styles.qr}>{state?.joinUrl ? <QRCodeSVG value={state.joinUrl} size={132} bgColor="#ffffff" fgColor="#24251f" level="M" title="扫码打开玩家挑战页面" /> : <span>正在获取<br />加入地址</span>}</div>
+            <div className={styles.joinCopy}><span>轮到你出手了</span><strong>三句话，<br />骗走一袋金币。</strong><Link href="/play">扫码加入挑战 <ArrowUpRight size={15} /></Link></div>
+            <p>{state ? `${mon(state.round.challengeFee, 0)} 测试 MON / 场` : '正在读取入场费'}<span>最多 {GAME_RULES.maxMessages} 条消息 · 成功自动到账</span></p>
           </section>
         </aside>
       </div>
@@ -137,6 +136,7 @@ export default function Arena() {
         <div className={styles.metricPanel}><span className={`${styles.metricIcon} ${styles.peopleIcon}`}><Users size={29} /></span><div><span>当前活跃钱包</span><strong>{state ? state.metrics.activeWallets.toLocaleString() : '—'}</strong><small>现场实时连接</small></div></div>
         <div className={styles.metricPanel}><span className={styles.metricIcon}><Activity size={29} /></span><div><span>已确认链上交易</span><strong>{state ? state.metrics.confirmedTransactions.toLocaleString() : '—'}</strong><small>{state ? `${state.metrics.pendingTransactions} 笔等待确认` : '正在同步交易'}</small></div></div>
         <div className={styles.metricPanel}><span className={styles.metricIcon}><Swords size={29} /></span><div><span>累计付费挑战</span><strong>{state ? state.metrics.totalChallenges.toLocaleString() : '—'}</strong><small>每一场都有链上记录</small></div></div>
+        <div className={styles.metricPanel}><span className={styles.metricIcon}><Clock3 size={29} /></span><div><span>交易等待确认</span><strong>{state ? state.metrics.pendingTransactions.toLocaleString() : '—'}</strong><small>仅确认后计入战绩</small></div></div>
       </footer>
       <ConfigNotice state={state} error={error} />
     </main>
