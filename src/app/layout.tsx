@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "@/components/providers";
+import '@fontsource-variable/space-grotesk';
+import '@fontsource-variable/nunito-sans';
 
 export const metadata: Metadata = {
-  title: "Monad · 第一次 x402 付款",
-  description: "在 Monad 测试网上，用 0.001 测试 USDC 解锁服务端内容。",
+  title: "MONAD RUG ARENA · 骗龙夺宝",
+  description: "三句话，骗走小黄龙的金币。多人实时 AI 攻防竞技场，运行于 Monad Testnet。",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN"><body>{children}</body></html>;
+  return <html lang="zh-CN"><body><Providers>{children}</Providers></body></html>;
 }

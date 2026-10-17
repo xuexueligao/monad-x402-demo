@@ -1,0 +1,7 @@
+artifacts/
+cache/
+.local/
+node_modules/
+.env*
+!.env.example
+!.env.arena.example

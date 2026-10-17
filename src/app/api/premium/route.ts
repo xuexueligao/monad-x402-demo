@@ -9,15 +9,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const receiver = process.env.PAY_TO_ADDRESS;
-if (!receiver || !isAddress(receiver)) {
-  throw new Error("先运行 npm run wallet:create，配置本示例的测试网收款地址。");
-}
 
 const server = new x402ResourceServer(
   new HTTPFacilitatorClient({ url: TESTNET.facilitator }),
 ).register(TESTNET.network, new ExactEvmScheme());
 
-export const GET = withX402(
+export const GET = receiver && isAddress(receiver) ? withX402(
   async () => NextResponse.json({
     title: "你的第一次 x402 付款已完成",
     content: "这段内容来自受付款保护的服务端接口。只有支付验证和结算成功后，接口才会把结果返回给你。下一步可以把这里替换成 AI 生成的文案或报告。",
@@ -40,4 +37,10 @@ export const GET = withX402(
     mimeType: "application/json",
   },
   server,
+) : async () => NextResponse.json(
+  {
+    error: "LEGACY_X402_NOT_CONFIGURED",
+    message: "旧 x402 示例尚未配置有效的 PAY_TO_ADDRESS；MONAD RUG ARENA 游戏不受影响。",
+  },
+  { status: 503, headers: { "Cache-Control": "no-store" } },
 );

@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.local
+.env*
+contracts/node_modules
+contracts/.local
+contracts/artifacts
+docs
+deployments
+*.log

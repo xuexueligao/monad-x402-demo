@@ -1,4 +1,4 @@
-param([ValidateSet('install','dev','build','start','check','wallet:create','smoke','pay:testnet','verify:browser')][string]$Task='dev')
+param([string]$Task='dev:arena')
 $ErrorActionPreference='Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $taskTempPath=Join-Path $PSScriptRoot '.local\tmp'

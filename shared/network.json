@@ -1,0 +1,9 @@
+{
+  "chainId": 10143,
+  "name": "Monad Testnet",
+  "currency": "MON",
+  "rpc": "https://testnet-rpc.monad.xyz",
+  "explorer": "https://testnet.monadscan.com",
+  "officialDocs": "https://docs.monad.xyz/developer-essentials/testnet",
+  "verifiedOn": "2026-10-17"
+}

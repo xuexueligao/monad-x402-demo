@@ -1,35 +1,67 @@
 {
-  "name": "monad-x402-demo",
+  "name": "monad-rug-arena",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 3143",
+    "dev": "node scripts/arena-run.mjs dev",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port 3143",
+    "start": "node scripts/arena-run.mjs start",
     "check": "tsc --noEmit",
     "wallet:create": "node --env-file-if-exists=.env.local scripts/create-test-wallet.mjs",
     "smoke": "node --env-file-if-exists=.env.local scripts/smoke.mjs",
     "pay:testnet": "node --env-file-if-exists=.env.local scripts/pay-testnet.mjs",
-    "verify:browser": "node --env-file-if-exists=.env.local scripts/verify-browser.mjs"
+    "verify:browser": "node --env-file-if-exists=.env.local scripts/verify-browser.mjs",
+    "dev:arena": "node scripts/arena-run.mjs dev",
+    "start:arena": "node scripts/arena-run.mjs start",
+    "server:arena": "node scripts/arena-run.mjs server",
+    "setup:arena": "node scripts/arena-setup.mjs",
+    "contracts:compile": "node scripts/arena-node.mjs contracts/scripts/compile.mjs",
+    "test:contracts": "node scripts/arena-node.mjs contracts/scripts/run-local.mjs test",
+    "test:server": "node scripts/arena-node.mjs --import tsx --test scripts/test-arena-backend.mjs",
+    "test:e2e": "node scripts/arena-node.mjs --import tsx scripts/verify-arena-e2e.ts",
+    "check:server": "tsc --noEmit -p server/tsconfig.json",
+    "deploy:arena": "node scripts/arena-node.mjs --env-file-if-exists=.env.arena.local contracts/scripts/deploy-arena.mjs",
+    "verify:arena-browser": "node scripts/arena-node.mjs scripts/verify-arena-browser.mjs",
+    "test:agent": "node scripts/arena-node.mjs --import tsx --test scripts/test-game-agent.mjs"
   },
   "dependencies": {
+    "@fastify/cors": "11.3.1",
+    "@fontsource-variable/nunito-sans": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0",
+    "@mariozechner/pi-agent-core": "0.73.1",
+    "@mariozechner/pi-ai": "0.73.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@tanstack/react-query": "5.104.3",
     "@x402/core": "2.28.0",
     "@x402/evm": "2.28.0",
     "@x402/fetch": "2.28.0",
     "@x402/next": "2.28.0",
+    "dotenv": "18.0.8",
+    "fastify": "5.12.7",
+    "lucide-react": "1.59.0",
     "next": "16.4.2",
+    "qrcode.react": "4.2.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "viem": "2.57.7"
+    "socket.io": "4.8.4",
+    "socket.io-client": "4.8.4",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typebox": "1.1.24",
+    "viem": "2.57.7",
+    "wagmi": "2.19.5",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "22.19.11",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "typescript": "5.9.3",
-    "playwright": "1.62.1"
+    "playwright": "1.62.1",
+    "typescript": "5.9.3"
   },
-  "engines": { "node": ">=22.9.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "packageManager": "npm@10.9.2"
 }
