@@ -34,6 +34,7 @@ export default function Play() {
   const [input, setInput] = useState('');
   const [recoveryPaymentHash, setRecoveryPaymentHash] = useState('');
   const chatEnd = useRef<HTMLDivElement>(null);
+  const recoveryPanel = useRef<HTMLDivElement>(null);
   const stats = state?.leaderboard.find(row => row.address.toLowerCase() === address?.toLowerCase());
   const busy = ['starting', 'thinking', 'signing', 'payment_pending', 'payment_verifying', 'settling', 'recovering'].includes(phase) || roundPending;
   const roundClosed = !!state?.configured && (!state.round.active || state.round.endsAt * 1000 <= Date.now());
@@ -51,8 +52,12 @@ export default function Play() {
 
   useEffect(() => { if (phase === 'active' || phase === 'confirmed') void refreshBalance(); }, [phase, refreshBalance]);
   useEffect(() => {
+    if (recoveryNeeded) {
+      recoveryPanel.current?.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+      return;
+    }
     if (messages.length || result) chatEnd.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'nearest' });
-  }, [messages, result, phase, streamingText]);
+  }, [messages, result, phase, streamingText, recoveryNeeded]);
   useEffect(() => { setInput(''); setRecoveryPaymentHash(''); }, [address, session?.id]);
   useEffect(() => { if (ended && session?.id) router.replace(`/result/${session.id}`); }, [ended, session?.id, router]);
 
@@ -80,7 +85,7 @@ export default function Play() {
           <div className={styles.chatHud}><span><MessageCircle size={13} />剩 {remaining} 条消息</span><span><Clock3 size={13} />{paid ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` : '付款后计时'}</span><span><Coins size={13} />{paid ? '已付' : '入场'} {mon(fee, 0)} MON</span></div>
           {state?.aiMode === 'local-rules' && <div className={styles.localMode}>当前对手：Pi 本地规则奶龙</div>}
           <div className={styles.messages} aria-live="polite">
-            {recoveryNeeded && session && <div className={styles.recovery} role="status">
+            {recoveryNeeded && session && <div ref={recoveryPanel} className={styles.recovery} role="status">
               <Shield size={24} /><h2>{recovering ? '正在恢复本场挑战…' : '恢复已付费挑战'}</h2>
               <p>{session.recoveryCheckpoint ? '使用已保存的挑战记录恢复对话，付款记录会保留。' : '服务重启后，旧对话暂时无法核验。恢复后将重新开始本场，不会重复收费。'}</p>
               {!session.recoveryCheckpoint && <small>只需原付款钱包签一条身份证明，无需付款交易。</small>}
