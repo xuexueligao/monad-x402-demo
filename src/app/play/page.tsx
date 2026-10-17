@@ -20,6 +20,7 @@ const phaseNames: Record<string, string> = {
   payment_pending: '付款交易确认中', payment_verifying: '正在核验付款', payment_failed: '付款未完成',
   active: '挑战进行中', thinking: '奶龙正在思考', resolved: '判定完成，准备结算',
   settling: '后台正在链上结算', settlement_failed: '结算可重试', confirmed: '链上已确认',
+  recovery_required: '需要恢复本场', recovering: '正在恢复本场',
 };
 
 export default function Play() {
@@ -28,12 +29,13 @@ export default function Play() {
   const { address, isConnected, chainId } = useAccount();
   const { data: balance, refetch: refreshBalance } = useBalance({ address, chainId: monad.id, query: { enabled: !!address, refetchInterval: 15000 } });
   const { session, messages, phase, error, paymentHash, remaining, secondsLeft, result,
-    start, send, finish, nextRound, reset, roundPending, pendingActionHash } = useChallenge();
+    start, send, finish, nextRound, reset, recover, recoveryNeeded, recovering, recoveryNeedsPaymentHash, roundPending, pendingActionHash } = useChallenge();
   const { streamingText, toolStatus } = useAgentStream(session, phase === 'thinking');
   const [input, setInput] = useState('');
+  const [recoveryPaymentHash, setRecoveryPaymentHash] = useState('');
   const chatEnd = useRef<HTMLDivElement>(null);
   const stats = state?.leaderboard.find(row => row.address.toLowerCase() === address?.toLowerCase());
-  const busy = ['starting', 'thinking', 'signing', 'payment_pending', 'payment_verifying', 'settling'].includes(phase) || roundPending;
+  const busy = ['starting', 'thinking', 'signing', 'payment_pending', 'payment_verifying', 'settling', 'recovering'].includes(phase) || roundPending;
   const roundClosed = !!state?.configured && (!state.round.active || state.round.endsAt * 1000 <= Date.now());
   const paid = !!session?.paidAt;
   const staleInvoice = !paid && !!session && !!state && session.roundId !== state.round.id;
@@ -51,7 +53,7 @@ export default function Play() {
   useEffect(() => {
     if (messages.length || result) chatEnd.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'nearest' });
   }, [messages, result, phase, streamingText]);
-  useEffect(() => { setInput(''); }, [address]);
+  useEffect(() => { setInput(''); setRecoveryPaymentHash(''); }, [address, session?.id]);
   useEffect(() => { if (ended && session?.id) router.replace(`/result/${session.id}`); }, [ended, session?.id, router]);
 
   async function onSend(event: FormEvent) {
@@ -78,7 +80,15 @@ export default function Play() {
           <div className={styles.chatHud}><span><MessageCircle size={13} />剩 {remaining} 条消息</span><span><Clock3 size={13} />{paid ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` : '付款后计时'}</span><span><Coins size={13} />{paid ? '已付' : '入场'} {mon(fee, 0)} MON</span></div>
           {state?.aiMode === 'local-rules' && <div className={styles.localMode}>当前对手：Pi 本地规则奶龙</div>}
           <div className={styles.messages} aria-live="polite">
-            {!paid && !result && <div className={styles.welcome}>
+            {recoveryNeeded && session && <div className={styles.recovery} role="status">
+              <Shield size={24} /><h2>{recovering ? '正在恢复本场挑战…' : '恢复已付费挑战'}</h2>
+              <p>{session.recoveryCheckpoint ? '使用已保存的挑战记录恢复对话，付款记录会保留。' : '服务重启后，旧对话暂时无法核验。恢复后将重新开始本场，不会重复收费。'}</p>
+              {!session.recoveryCheckpoint && <small>只需原付款钱包签一条身份证明，无需付款交易。</small>}
+              {recoveryNeedsPaymentHash && <label>原付款交易哈希<input value={recoveryPaymentHash} onChange={event => setRecoveryPaymentHash(event.target.value.trim())} placeholder="0x…，从原付款钱包的交易记录中复制" aria-label="本场原付款交易哈希" disabled={recovering} /><small>需要原付款交易才能核验，请不要再次付款。</small></label>}
+              {!isConnected || chainId !== monad.id ? <WalletButton className="button-gold" /> : <button className={styles.payButton} onClick={() => void recover(recoveryNeedsPaymentHash ? { challengeId: session.id, player: session.player, paymentHash: recoveryPaymentHash } : undefined)} disabled={recovering || recoveryNeedsPaymentHash && !/^0x[\da-f]{64}$/i.test(recoveryPaymentHash)}>{recovering ? <LoaderCircle size={17} className="spin" /> : <Shield size={17} />}{recovering ? '恢复中…' : '恢复已付费挑战'}</button>}
+              {paymentHash && <Link className={styles.transactionLink} href={`/tx/${paymentHash}`}>查看原付款 <ArrowUpRight size={13} /></Link>}
+            </div>}
+            {!paid && !result && !recoveryNeeded && <div className={styles.welcome}>
               <span className={styles.welcomeIcon}>{paymentWaiting ? <Wallet size={27} /> : <Swords size={27} />}</span>
               <h2>{paymentWaiting ? phaseNames[phase] : '奶龙的钱袋，等你来骗。'}</h2>
               <p>{phase === 'signing' ? '请用你连接的钱包确认本场入场交易。' : phase === 'payment_pending' ? '合约确认收款后，聊天会自动开放。' : phase === 'payment_verifying' ? '已看到链上付款，正在开放你的专属对话。' : <>先付 {mon(fee, 0)} 测试 MON，获得 {maxMessages} 次说服机会。<br />说服成功后，奖金直接进入你的钱包。</>}</p>
@@ -93,13 +103,13 @@ export default function Play() {
             {messages.map((message, index) => <div className={`${styles.message} ${message.role === 'user' ? styles.playerMessage : styles.dragonMessage}`} key={`${session?.id}-${index}`}><span className={styles.avatar}>{message.role === 'assistant' ? <img src="/dragon.png" alt="" /> : <Wallet size={15} />}</span><div><span className={styles.messageName}>{message.role === 'assistant' ? '奶龙' : shortAddress(session?.player || address)}</span><p>{message.content}</p></div></div>)}
             {phase === 'thinking' && <div className={`${styles.message} ${styles.dragonMessage}`}><span className={styles.avatar}><img src="/dragon.png" alt="" /></span><div><span className={styles.messageName}>{toolStatus || '奶龙正在掂量它的金币…'}</span>{streamingText ? <p>{streamingText}<span className={styles.caret} /></p> : <p className={styles.thinking}><i /><i /><i /></p>}</div></div>}
             {ended && session && <div className={styles.openingResult}><LoaderCircle size={21} className="spin" /><strong>正在打开本轮结果</strong><span>最终胜负与奖金以真实链上记录为准。</span><Link href={`/result/${session.id}`}>查看挑战结果 <ArrowRight size={14} /></Link></div>}
-            {error && <div className={styles.error} role="alert">{error}<span>{paid ? '已付费用会保留，重试不会再次收费。' : paymentHash ? '交易已保留，等待确认即可。' : '可以再次连接或付款，确认后才开放聊天。'}</span></div>}
+            {error && <div className={styles.error} role="alert">{error}<span>{recoveryNeeded ? '先恢复本场，原付款记录会保留。' : paid ? '已付费用会保留，重试不会再次收费。' : paymentHash ? '交易已保留，等待确认即可。' : '可以再次连接或付款，确认后才开放聊天。'}</span></div>}
             {expired && phase === 'active' && <div className={styles.notice}><Clock3 size={14} />本场时间已到，结束对话即可自动结算。</div>}
             <div ref={chatEnd} />
           </div>
           <div className={styles.chatBottom}>
-            {paid && !ended && <form className={styles.compose} onSubmit={onSend}><textarea aria-label="对奶龙说的话" placeholder={phase === 'thinking' ? '奶龙正在回复，稍等一下…' : expired ? '本场时间已到，请结束并结算' : '说点什么，让奶龙放下戒心…'} maxLength={1000} rows={2} value={input} onChange={event => setInput(event.target.value)} disabled={!active || busy} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void onSend(event); } }} /><button type="submit" aria-label="发送消息" disabled={!input.trim() || !active || busy}>{phase === 'thinking' ? <LoaderCircle size={20} className="spin" /> : <Send size={20} />}</button></form>}
-            <div className={styles.composerFoot}><Shield size={11} />{paid ? '聊天无需钱包签名 · 结果由合约验证' : 'Monad Testnet · 先付费，再开始对话'}</div>
+            {paid && !ended && <form className={styles.compose} onSubmit={onSend}><textarea aria-label="对奶龙说的话" placeholder={recoveryNeeded ? '请先恢复本场挑战，不会再次收费' : phase === 'thinking' ? '奶龙正在回复，稍等一下…' : expired ? '本场时间已到，请结束并结算' : '说点什么，让奶龙放下戒心…'} maxLength={1000} rows={2} value={input} onChange={event => setInput(event.target.value)} disabled={!active || busy} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void onSend(event); } }} /><button type="submit" aria-label="发送消息" disabled={!input.trim() || !active || busy}>{phase === 'thinking' ? <LoaderCircle size={20} className="spin" /> : <Send size={20} />}</button></form>}
+            <div className={styles.composerFoot}><Shield size={11} />{recoveryNeeded ? '恢复只验证身份 · 原付款继续有效' : paid ? '聊天无需钱包签名 · 结果由合约验证' : 'Monad Testnet · 先付费，再开始对话'}</div>
           </div>
         </section>
 

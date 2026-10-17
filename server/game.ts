@@ -1,10 +1,11 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { getAddress, keccak256, stringToHex, type Address, type Hex } from 'viem';
+import { getAddress, keccak256, stringToHex, verifyMessage, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { GAME_RULES, RESULT_DOMAIN, RESULT_TYPES } from '../shared/config';
 import type { ChallengeSession, GameEvent, GameSnapshot } from '../shared/types';
+import { getRecoveryMessage, RECOVERY_SIGNATURE_WINDOW_MS, type SessionRecoveryRequest } from '../shared/session-recovery';
 import type { AiService } from './ai';
 import type { ChainAdapter, ChainChallenge } from './chain';
 import type { ServerConfig } from './config';
@@ -15,6 +16,8 @@ export class ApiError extends Error {
 }
 export interface GameOptions { now?: () => number }
 const finished = (session: ChallengeSession) => session.status === 'settled';
+const CHECKPOINT_DOMAIN = 'monad-rug-arena/session-recovery/v1\n';
+const openingMessage = { role: 'assistant' as const, content: '入场费已进入链上金库！奶龙的钱袋鼓鼓的，你最多有三次机会，让我自愿交出金币吧。🐉' };
 
 export class ArenaGame {
   private readonly sessions = new Map<string, ChallengeSession>();
@@ -54,6 +57,7 @@ export class ArenaGame {
     if (saved.chainId !== this.chain.chainId || saved.contract?.toLowerCase() !== this.chain.contractAddress?.toLowerCase()) return;
     for (const session of saved.sessions as ChallengeSession[]) {
       if (!session.id || !session.token || !session.fee || !Array.isArray(session.messages)) continue;
+      delete session.recoveryCheckpoint;
       this.sessions.set(session.id, session);
       if (!finished(session)) this.players.set(session.player.toLowerCase(), session.id);
     }
@@ -122,13 +126,117 @@ export class ArenaGame {
     finally { if (this.locks.get(key) === current) this.locks.delete(key); }
   }
   private authenticate(id: string, token: string) {
-    const session = this.sessions.get(id);
-    if (!session) throw new ApiError(404, 'Challenge not found. Use the same backend session store to resume a paid challenge.');
+    const session = this.sessions.get(id.toLowerCase());
+    if (!session) throw new ApiError(404, 'Challenge not found. Recover it with the browser backup or the original payment wallet.');
     const supplied = Buffer.from(token || ''), expected = Buffer.from(session.token);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw new ApiError(403, 'Invalid challenge session token.');
     return session;
   }
-  getSession(id: string, token: string) { return structuredClone(this.authenticate(id, token)); }
+  private checkpointMac(payload: string) {
+    if (!this.config.signerKey) throw new ApiError(503, 'Session recovery signing is not configured.');
+    return createHmac('sha256', Buffer.from(this.config.signerKey.slice(2), 'hex')).update(CHECKPOINT_DOMAIN).update(payload).digest();
+  }
+  private expose(session: ChallengeSession): ChallengeSession {
+    const copy = structuredClone(session);
+    delete copy.recoveryCheckpoint;
+    if (this.config.signerKey && this.chain.contractAddress) {
+      const payload = Buffer.from(JSON.stringify({ version: 1, chainId: this.chain.chainId, contractAddress: this.chain.contractAddress.toLowerCase(), session: copy })).toString('base64url');
+      copy.recoveryCheckpoint = `v1.${payload}.${this.checkpointMac(payload).toString('base64url')}`;
+    }
+    return copy;
+  }
+  private readCheckpoint(checkpoint: string): ChallengeSession {
+    const [version, payload, signature, extra] = checkpoint.split('.');
+    if (version !== 'v1' || !payload || !signature || extra || !/^[\w-]+$/.test(payload) || !/^[\w-]+$/.test(signature)) throw new ApiError(403, 'Invalid session recovery checkpoint.');
+    const supplied = Buffer.from(signature, 'base64url'), expected = this.checkpointMac(payload);
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw new ApiError(403, 'Invalid session recovery checkpoint signature.');
+    let saved;
+    try { saved = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); }
+    catch { throw new ApiError(403, 'Invalid session recovery checkpoint.'); }
+    if (saved.version !== 1 || saved.chainId !== this.chain.chainId || saved.contractAddress !== this.chain.contractAddress?.toLowerCase()) throw new ApiError(409, 'This recovery checkpoint belongs to another chain or arena contract.');
+    const session = saved.session as ChallengeSession;
+    if (!session || !/^0x[\da-f]{64}$/i.test(session.id) || !session.token || !session.fee || !Array.isArray(session.messages)) throw new ApiError(403, 'Invalid session recovery checkpoint.');
+    delete session.recoveryCheckpoint;
+    session.id = session.id.toLowerCase();
+    return session;
+  }
+  private assertEntry(session: Pick<ChallengeSession, 'player' | 'roundId' | 'fee'>, record: ChainChallenge) {
+    if (!record.enteredAt || getAddress(record.player) !== getAddress(session.player) || record.roundId !== session.roundId || record.fee !== session.fee) throw new ApiError(409, 'Confirmed entry does not match this challenge wallet, round and fee.');
+  }
+  private async recoveryRecord(id: string) {
+    try { return await this.chain.getChallenge(id as Hex); }
+    catch { throw new ApiError(503, '无法读取链上入场记录，请稍后恢复本场；无需再次付款。'); }
+  }
+  private async verifyEntry(session: Pick<ChallengeSession, 'id' | 'player' | 'roundId' | 'fee'>, hash: string) {
+    let record: ChainChallenge;
+    try { record = await this.chain.verifyPayment(session, hash.toLowerCase() as Hex); }
+    catch { throw new ApiError(400, '入场付款尚未确认，或付款钱包、合约、挑战编号、回合或金额不匹配。请核对交易后重试。'); }
+    this.assertEntry(session, record);
+    return record;
+  }
+  getSession(id: string, token: string) { return this.expose(this.authenticate(id, token)); }
+  async recover(input: SessionRecoveryRequest): Promise<ChallengeSession> {
+    await this.requireReady();
+    const checkpoint = 'checkpoint' in input ? this.readCheckpoint(input.checkpoint) : undefined;
+    const id = (checkpoint?.id || ('challengeId' in input ? input.challengeId : '')).toLowerCase();
+    const player = getAddress(checkpoint?.player || ('player' in input ? input.player : ''));
+    if (!checkpoint && 'signature' in input) {
+      if (!Number.isSafeInteger(input.issuedAt) || this.now() - input.issuedAt > RECOVERY_SIGNATURE_WINDOW_MS || input.issuedAt > this.now() + 30_000) throw new ApiError(400, 'Recovery signature expired. Sign a fresh recovery request with the original payment wallet.');
+      const message = getRecoveryMessage({ ...input, challengeId: id, player, chainId: this.chain.chainId, contractAddress: this.chain.contractAddress! });
+      let valid = false;
+      try { valid = await verifyMessage({ address: player, message, signature: input.signature as Hex }); } catch { /* Invalid signatures never restore a session. */ }
+      if (!valid) throw new ApiError(403, 'The original payment wallet must sign this recovery request.');
+    }
+    return this.locked(`player:${player.toLowerCase()}`, () => this.locked(`session:${id}`, async () => {
+      const current = this.sessions.get(id);
+      if (current && getAddress(current.player) !== player) throw new ApiError(403, 'This challenge belongs to a different payment wallet.');
+      // A valid old backup can prove access, but can never rewind a session this instance still knows.
+      let session = current || checkpoint;
+      if (!current && session) session.token = randomBytes(32).toString('hex');
+      let record = await this.recoveryRecord(id);
+      if (!session) {
+        if (!record.enteredAt || getAddress(record.player) !== player) throw new ApiError(403, 'No confirmed challenge entry belongs to this payment wallet.');
+        session = {
+          id, token: randomBytes(32).toString('hex'), player, roundId: record.roundId, fee: record.fee,
+          messages: [], expiresAt: record.expiresAt * 1000, maxMessages: GAME_RULES.maxMessages,
+          status: 'payment_required', aiMode: this.ai.mode,
+        };
+      }
+      const suppliedHash = input.paymentHash?.toLowerCase() as Hex | undefined;
+      const knownHash = (current?.paymentHash || checkpoint?.paymentHash)?.toLowerCase() as Hex | undefined;
+      if (knownHash && suppliedHash && knownHash !== suppliedHash) throw new ApiError(409, 'This challenge already has a different confirmed entry payment.');
+      const paymentHash = knownHash || suppliedHash;
+      if (paymentHash) record = await this.verifyEntry(session, paymentHash);
+      else if (record.enteredAt) this.assertEntry(session, record);
+      if (record.enteredAt && (paymentHash || record.settled)) {
+        session.paymentHash = paymentHash;
+        session.paidAt = record.enteredAt * 1000;
+        session.entryExpiresAt = record.expiresAt * 1000;
+        if (!current && !checkpoint && !record.settled) {
+          // Compensation is only for a genuinely lost store, after wallet + receipt verification.
+          // Client history and client verdicts are never part of this branch.
+          session.recoveredAt = this.now();
+          session.expiresAt = this.now() + GAME_RULES.challengeDurationSeconds * 1000;
+          session.messages = [{ role: 'assistant', content: '已核验原钱包的入场付款。服务会话丢失，本场免费恢复一次 180 秒、最多三次对话，请重新向奶龙出招。🐉' }];
+          session.status = 'active';
+        } else if (session.status === 'payment_required' && !record.settled) {
+          session.expiresAt = record.expiresAt * 1000;
+          session.messages = [{ ...openingMessage }];
+          session.status = 'active';
+        }
+      }
+      if (!current) {
+        const otherId = this.players.get(player.toLowerCase());
+        const other = otherId ? this.sessions.get(otherId) : undefined;
+        if (other && other.id !== id && !finished(other) && other.paymentHash && !record.settled) throw new ApiError(409, 'This wallet has another paid challenge in progress. Finish it before recovering this challenge.');
+        this.sessions.set(id, session);
+      }
+      if (record.settled) this.applySettlement(session, record);
+      else if (!finished(session)) this.players.set(player.toLowerCase(), id);
+      this.persist();
+      return this.expose(session);
+    }));
+  }
   async start(player: string): Promise<ChallengeSession> {
     const address = getAddress(player as Address);
     return this.locked(`player:${address.toLowerCase()}`, async () => {
@@ -144,7 +252,7 @@ export class ArenaGame {
         maxMessages: GAME_RULES.maxMessages, status: 'payment_required', aiMode: this.ai.mode,
       };
       this.sessions.set(session.id, session); this.players.set(address.toLowerCase(), session.id); this.persist();
-      return structuredClone(session);
+      return this.expose(session);
     });
   }
   private async paidRecord(session: ChallengeSession): Promise<ChainChallenge> {
@@ -152,32 +260,37 @@ export class ArenaGame {
     let record: ChainChallenge;
     try { record = await this.chain.getChallenge(session.id as Hex); }
     catch { throw new ApiError(503, '无法读取已付款挑战，请稍后重试。'); }
-    if (!record.enteredAt || getAddress(record.player) !== getAddress(session.player) || record.roundId !== session.roundId || record.fee !== session.fee) throw new ApiError(409, 'Confirmed entry does not match this challenge wallet, round and fee.');
+    this.assertEntry(session, record);
     return record;
   }
   async payment(id: string, token: string, hash: Hex): Promise<ChallengeSession> {
+    id = id.toLowerCase();
     return this.locked(`session:${id}`, async () => {
       const session = this.authenticate(id, token);
       if (session.paymentHash) {
         if (session.paymentHash.toLowerCase() !== hash.toLowerCase()) throw new ApiError(409, 'This challenge already has a different confirmed entry payment.');
-        return structuredClone(session);
+        const record = await this.paidRecord(session);
+        if (record.settled) this.applySettlement(session, record);
+        return this.expose(session);
       }
       await this.requireReady();
       let record;
       try { record = await this.chain.verifyPayment(session, hash); }
       catch { throw new ApiError(400, '入场付款尚未确认，或付款钱包、合约、挑战编号、回合或金额不匹配。请核对交易后重试。'); }
-      if (record.settled) throw new ApiError(409, 'This paid challenge has already settled on chain.');
       if (!record.enteredAt || getAddress(record.player) !== getAddress(session.player) || record.roundId !== session.roundId || record.fee !== session.fee) throw new ApiError(400, 'Confirmed payment is not bound to this player and challenge.');
       session.paymentHash = hash; session.paidAt = record.enteredAt * 1000; session.expiresAt = record.expiresAt * 1000;
+      session.entryExpiresAt = record.expiresAt * 1000;
       session.status = 'active';
-      session.messages = [{ role: 'assistant', content: '入场费已进入链上金库！奶龙的钱袋鼓鼓的，你最多有三次机会，让我自愿交出金币吧。🐉' }];
+      session.messages = [{ ...openingMessage }];
+      if (record.settled) { this.applySettlement(session, record); return this.expose(session); }
       this.persist();
       this.publish('challenge:started', { challengeId: session.id, player: session.player, paymentHash: hash, fee: session.fee, maxMessages: session.maxMessages, expiresAt: session.expiresAt, aiMode: this.ai.mode }, session.roundId);
       if (this.now() >= session.expiresAt) await this.resolveAndSettle(session);
-      return structuredClone(session);
+      return this.expose(session);
     });
   }
   async message(id: string, token: string, content: string): Promise<ChallengeSession> {
+    id = id.toLowerCase();
     return this.locked(`session:${id}`, async () => {
       const session = this.authenticate(id, token);
       const paid = await this.paidRecord(session);
@@ -195,22 +308,24 @@ export class ArenaGame {
       } catch { throw new ApiError(502, '奶龙的思路打了个结。AI 暂时不可用，请重试，或结束本场；这条消息没有计入次数，也不会再次收费。'); }
       if (this.now() >= session.expiresAt) {
         await this.resolveAndSettle(session);
-        return structuredClone(session);
+        return this.expose(session);
       }
       session.messages.push({ role: 'user', content }, { role: 'assistant', content: answer.response });
       session.result = { ...answer, score: answer.result ? GAME_RULES.successScore : GAME_RULES.failureScore };
       this.persist();
       this.publish('challenge:message', { challengeId: session.id, player: session.player, messageNumber: count + 1, summary: answer.result ? '奶龙松开了钱袋，后台正在结算。' : '玩家提出了新计策，奶龙仍在守护金币。' }, session.roundId);
       if (answer.result || count + 1 === session.maxMessages) await this.resolveAndSettle(session);
-      return structuredClone(session);
+      return this.expose(session);
     });
   }
   async finish(id: string, token: string): Promise<ChallengeSession> {
+    id = id.toLowerCase();
     return this.locked(`session:${id}`, async () => {
       const session = this.authenticate(id, token);
-      await this.paidRecord(session);
+      const record = await this.paidRecord(session);
+      if (record.settled) this.applySettlement(session, record);
       if (!finished(session)) await this.resolveAndSettle(session);
-      return structuredClone(session);
+      return this.expose(session);
     });
   }
   private async resolveAndSettle(session: ChallengeSession) {
@@ -254,6 +369,7 @@ export class ArenaGame {
   private applySettlement(session: ChallengeSession, record: ChainChallenge) {
     if (!record.settled) throw new Error('Cannot mark an unconfirmed challenge as settled.');
     session.status = 'settled'; session.reward = record.reward; session.settledAt = record.settledAt * 1000; session.settlementError = undefined;
+    session.result = { response: session.result?.response, result: record.success, score: Number(record.score), reason: '已按链上确认的最终结果同步本场挑战。' };
     this.release(session); this.persist();
   }
   join(connectionId: string, player: string) {

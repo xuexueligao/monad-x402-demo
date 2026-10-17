@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type CSSProperties } from 'react';
-import { useReadContract } from 'wagmi';
+import { useAccount, useReadContract } from 'wagmi';
 import { ArrowRight, ArrowUpRight, Check, Coins, Copy, Crown, Home, LoaderCircle, RotateCcw, Share2, Shield, Sparkles } from 'lucide-react';
 import type { Abi, Address, Hex } from 'viem';
 import arenaAbi from '../../contracts/abi/RugArena.json';
 import { GAME_RULES } from '../../shared/config';
 import { ConfigNotice, Header, MiniLeaderboard } from '@/components/game-ui';
+import { WalletButton } from '@/components/wallet-button';
 import { useArena } from '@/lib/arena-context';
 import { useChallenge } from '@/lib/use-challenge';
 import { monad } from '@/lib/wagmi';
@@ -24,8 +25,10 @@ interface ChainRecord {
 export function ChallengeResultView({ challengeId }: { challengeId: string }) {
   const router = useRouter();
   const { state, events, error: worldError } = useArena();
+  const { address, chainId } = useAccount();
   const challenge = useChallenge();
   const [shareMessage, setShareMessage] = useState('');
+  const [recoveryPaymentHash, setRecoveryPaymentHash] = useState('');
   const validId = /^0x[\da-f]{64}$/i.test(challengeId);
   const current = challenge.session?.id.toLowerCase() === challengeId.toLowerCase();
   const { data, isLoading, error: chainError } = useReadContract({
@@ -40,9 +43,11 @@ export function ChallengeResultView({ challengeId }: { challengeId: string }) {
   const recorded = !!record && record.enteredAt > 0n;
   const paidKnown = recorded || current && !!challenge.session?.paidAt;
   const confirmed = !!record?.settled || current && challenge.phase === 'confirmed';
+  const recoveryAvailable = !confirmed && (current && challenge.recoveryNeeded || recorded && !challenge.session);
+  const recoveryNeedsHash = !current || challenge.recoveryNeedsPaymentHash;
   const success = confirmed ? record?.settled ? record.success : challenge.confirmedSuccess : current ? challenge.result?.result : undefined;
   const retryable = current && !confirmed && ['settlement_failed', 'resolved'].includes(challenge.phase);
-  const ongoing = current && !confirmed && !challenge.result && challenge.session?.status === 'active';
+  const ongoing = current && !confirmed && !challenge.result && challenge.phase === 'active';
   const loading = validId && (!state || isLoading);
   const missing = !validId || !!data && !recorded && !current;
   const view = missing ? 'missing' : confirmed ? success ? 'success' : 'failure' : retryable ? 'retry' : 'pending';
@@ -52,8 +57,8 @@ export function ChallengeResultView({ challengeId }: { challengeId: string }) {
   const fee = recorded ? record.fee.toString() : current ? challenge.session?.fee : state?.round.challengeFee;
   const settledEvent = events.find(event => event.type === 'chain:confirmed' && event.payload.action === 'settleChallenge' && String(event.payload.challengeId).toLowerCase() === challengeId.toLowerCase());
   const hash = current && challenge.txHash || settledEvent && String(settledEvent.payload.transactionHash || settledEvent.payload.hash || '');
-  const title = missing ? '这场挑战还没有记录。' : loading || !recorded && !current ? '正在翻开本场记录…' : confirmed ? success ? '挑战成功！' : '说服失败' : retryable ? '结果已保留，结算再试一次。' : ongoing ? '你的挑战还在进行。' : success ? '奶龙被你说服了！' : '本场判定，正在上链。';
-  const subtitle = missing ? '检查挑战链接，或回到竞技场开启一场新挑战。' : confirmed ? success ? '你成功说服了奶龙！金币已转入付款钱包。' : '奶龙笑出了声，它还是没有交出金币。' : ongoing ? '回到对话，抓住剩下的说服机会。' : '后台负责提交结算；确认后才会显示实际到账奖金。';
+  const title = missing ? '这场挑战还没有记录。' : loading || !recorded && !current ? '正在翻开本场记录…' : confirmed ? success ? '挑战成功！' : '说服失败' : recoveryAvailable ? '原付款已保留，恢复本场挑战。' : retryable ? '结果已保留，结算再试一次。' : ongoing ? '你的挑战还在进行。' : success ? '奶龙被你说服了！' : '本场判定，正在上链。';
+  const subtitle = missing ? '检查挑战链接，或回到竞技场开启一场新挑战。' : confirmed ? success ? '你成功说服了奶龙！金币已转入付款钱包。' : '奶龙笑出了声，它还是没有交出金币。' : recoveryAvailable ? current && challenge.session?.recoveryCheckpoint ? '使用保存的挑战记录恢复，不会再次收费。' : '旧对话暂时无法核验，恢复后将重新开始本场。原付款继续有效，不会重复收费。' : ongoing ? '回到对话，抓住剩下的说服机会。' : '后台负责提交结算；确认后才会显示实际到账奖金。';
 
   async function shareResult() {
     const url = `${window.location.origin}/result/${challengeId}`;
@@ -99,10 +104,15 @@ export function ChallengeResultView({ challengeId }: { challengeId: string }) {
           </>}
           {confirmed && !success && <div className={styles.dragonQuote}><span><img src="/dragon.png" alt="奶龙" /></span><div><strong>奶龙</strong><p>哈哈哈哈！还差得远呢！<br />想从我这里拿走金币？下次再来试试吧！</p></div></div>}
           {current && challenge.result?.reason && <p className={styles.reason}>奶龙的判定：{challenge.result.reason}</p>}
-          {current && (challenge.error || challenge.session?.settlementError) && <p className={styles.error} role="alert">{challenge.error || challenge.session?.settlementError}</p>}
+          {(current || recoveryAvailable) && (challenge.error || challenge.session?.settlementError) && <p className={styles.error} role="alert">{challenge.error || challenge.session?.settlementError}</p>}
           {chainError && !confirmed && <p className={styles.error} role="status">暂时无法读取链上记录，正在重新连接。</p>}
+          {recoveryAvailable && <div className={styles.receipt}>
+            <Shield size={22} /><div><strong>{challenge.recovering ? '正在恢复本场…' : '恢复只需身份签名，不会发送付款交易'}</strong><span>请使用原付款钱包 {shortAddress(player)}，并切换到 Monad Testnet。</span>
+              {recoveryNeedsHash && <label style={{ display: 'grid', gap: 6, marginTop: 10, fontSize: 11 }}>原付款交易哈希<input aria-label="本场原付款交易哈希" placeholder="0x…，从原付款钱包的交易记录中复制" value={recoveryPaymentHash} onChange={event => setRecoveryPaymentHash(event.target.value.trim())} disabled={challenge.recovering} style={{ width: '100%', minWidth: 260, padding: 9, border: '1px solid #b3956255', borderRadius: 5, color: 'inherit', background: '#ffffff0a', fontSize: 11 }} /><span>需要原付款交易才能核验，请不要再次付款。</span></label>}
+            </div>
+          </div>}
           <div className={styles.actions}>
-            {retryable ? <button className={styles.primary} onClick={() => void challenge.finish()}><RotateCcw size={17} />重试结算 · 不再收费</button> : ongoing ? <Link className={styles.primary} href="/play">继续本场对话 <ArrowRight size={18} /></Link> : confirmed ? <button className={styles.primary} disabled={current && challenge.phase !== 'confirmed'} onClick={playAgain}>再来一局 <ArrowRight size={18} /></button> : missing ? <Link className={styles.primary} href="/play">回到挑战 <ArrowRight size={18} /></Link> : <span className={styles.waiting}><LoaderCircle className="spin" size={17} />结算确认中</span>}
+            {recoveryAvailable ? !address || chainId !== monad.id || address.toLowerCase() !== player?.toLowerCase() ? <WalletButton className="button-gold" /> : <button className={styles.primary} disabled={challenge.recovering || recoveryNeedsHash && !/^0x[\da-f]{64}$/i.test(recoveryPaymentHash)} onClick={() => void challenge.recover(current && !recoveryNeedsHash ? undefined : { challengeId, player: player!, paymentHash: recoveryPaymentHash })}>{challenge.recovering ? <LoaderCircle className="spin" size={17} /> : <RotateCcw size={17} />}{challenge.recovering ? '恢复中…' : '恢复已付费挑战'}</button> : retryable ? <button className={styles.primary} onClick={() => void challenge.finish()}><RotateCcw size={17} />重试结算 · 不再收费</button> : ongoing ? <Link className={styles.primary} href="/play">继续本场对话 <ArrowRight size={18} /></Link> : confirmed ? <button className={styles.primary} disabled={current && challenge.phase !== 'confirmed'} onClick={playAgain}>再来一局 <ArrowRight size={18} /></button> : missing ? <Link className={styles.primary} href="/play">回到挑战 <ArrowRight size={18} /></Link> : <span className={styles.waiting}><LoaderCircle className="spin" size={17} />结算确认中</span>}
             {confirmed && (success ? <button className={styles.secondary} onClick={() => void shareResult()}><Share2 size={16} />分享战绩</button> : <Link className={styles.secondary} href="/"><Home size={17} />返回大厅</Link>)}
           </div>
           <span className={styles.shareStatus} role="status">{shareMessage}</span>

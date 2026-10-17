@@ -63,6 +63,12 @@ export interface ChallengeSession {
   fee: string;
   paymentHash?: `0x${string}`;
   paidAt?: number;
+  /** Original entry deadline recorded on chain, unchanged by a lost-session recovery. */
+  entryExpiresAt?: number;
+  /** A wallet-authenticated replacement conversation after the server lost its store. */
+  recoveredAt?: number;
+  /** Server-authenticated browser backup; contains private conversation and session access. */
+  recoveryCheckpoint?: string;
   settlementHash?: `0x${string}`;
   settledAt?: number;
   reward?: string;

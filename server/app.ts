@@ -69,6 +69,13 @@ export async function createApp(options: CreateAppOptions = {}): Promise<ArenaAp
     const body = z.object({ player: addressSchema }).parse(request.body);
     return game.start(body.player);
   });
+  app.post('/api/challenges/recover', { bodyLimit: 64 * 1024 }, async (request) => {
+    const body = z.union([
+      z.object({ checkpoint: z.string().min(1).max(64 * 1024), paymentHash: hashSchema.optional() }).strict(),
+      z.object({ challengeId: hashSchema, player: addressSchema, paymentHash: hashSchema, issuedAt: z.number().int().nonnegative(), signature: z.string().regex(/^0x[\da-f]{130}$/i, 'A wallet message signature is required.') }).strict(),
+    ]).parse(request.body);
+    return game.recover(body);
+  });
   app.post('/api/challenges/:id/payment', async (request) => {
     const { id } = z.object({ id: hashSchema }).parse(request.params);
     const { token, hash } = z.object({ token: tokenSchema, hash: hashSchema }).parse(request.body);
