@@ -102,3 +102,31 @@ npm run build
 ```
 
 启动、Reown 配置、Render 单服务、Docker 持久化路径和一分钟演示流程见根 [README](../README.md)。服务端秘密只使用 `AI_API_KEY`、`ARENA_RESULT_SIGNER_PRIVATE_KEY` 等后台变量；私钥与模型 Key 不写入文档、前端或 Git。
+
+## 短时并发压测（2026-10-17）
+
+完整数据见 [load-test.json](../deployments/load-test.json)。线上运行版本为 `2ab9ece`；本次只新增压测脚本和报告，没有修改业务实现或正在改版的前端，没有产生新的测试网付款、结算、发奖或远程 AI 调用。
+
+| 实际场景 | 结果 |
+| --- | --- |
+| 固定云端 5 / 15 / 30 个围观 Socket | 全部连接成功，无异常断线；对应 5 / 15 / 30 次状态 GET 全部 200 |
+| 云端 30 人围观 | 状态 GET p50 455 ms、p95 1995 ms；短时测试结束健康状态正常 |
+| 云端 1 个实际开局请求 | 1/1 成功，创建未付款私有会话 |
+| 云端同时 5 个实际开局请求 | **4/5 成功，1 个 RPC 限流 503**；立即停止进一步开局加压 |
+| 本地 5 / 10 / 25 个并发核心挑战 | 全部完成；真实 HTTP、Socket.IO 与 Pi Runtime，模型流和链适配器为测试 fixture |
+| 本地 25 个并发核心挑战 | HTTP p95 817 ms、整轮 p95 1422 ms；付款门槛、真实 EIP-712 签名、隔离、幂等结算和共享快照通过 |
+| 私有本地 EVM + 15 RPC/秒代理，1 个历史钱包 | 空闲 6.5 秒无 429；脚本连续开局、付款核验后立即聊天及结束，后两步均被 RPC 限流阻断 |
+| 私有本地 EVM + 15 RPC/秒代理，10 个历史钱包 | 10 个同时开局均成功；随后快速连续 10 次真实本地付款核验均失败，9 个 503、1 个 400 |
+
+云端开局压测前后公共奖池均为 20 MON、链上挑战数均为 3，只有少量未付款私有会话；测试地址不是真实玩家，未广播成已付款挑战。结束后云端健康检查为 ready / live、relayer ready，所有压测自建服务和 Socket 均已关闭。
+
+结论：本次短测证明 30 人围观正常，同时 5 个开局请求已能复现 RPC 限流。不能据此宣称“5 人固定上限”或“25 人云端 AI 挑战稳定”；本地 Runtime 测试未测远程模型吞吐，本地限流代理也不是 Monad 的精确容量模型。多人核心流程仍需集中减少 RPC 重复读取和突发，并对限流做退避重试。
+
+可重复命令（两条 cloud 命令会访问项目固定云服务；entry 只创建未付款会话，不会支付）：
+
+```powershell
+node scripts/load-test-cloud.mjs
+node scripts/load-test-entry.mjs
+node scripts/arena-node.mjs --import tsx scripts/load-test-core.mjs
+node scripts/arena-node.mjs --import tsx scripts/load-test-rpc.ts
+```
