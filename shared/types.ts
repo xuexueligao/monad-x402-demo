@@ -37,6 +37,7 @@ export interface GameSnapshot {
   events: GameEvent[];
   joinUrl: string;
   chainError?: string;
+  relayer?: { address: string; balance: string; ready: boolean };
 }
 export interface ChatMessage { role: 'user' | 'assistant'; content: string }
 export interface ChallengeResult {
@@ -57,7 +58,15 @@ export interface ChallengeSession {
   messages: ChatMessage[];
   expiresAt: number;
   maxMessages: number;
-  status: 'active' | 'resolved';
+  status: 'payment_required' | 'active' | 'resolved' | 'settling' | 'settled' | 'settlement_failed';
+  /** Exact, fixed entry fee in integer wei. The player pays once before chatting. */
+  fee: string;
+  paymentHash?: `0x${string}`;
+  paidAt?: number;
+  settlementHash?: `0x${string}`;
+  settledAt?: number;
+  reward?: string;
+  settlementError?: string;
   aiMode: 'live' | 'local-rules';
   result?: { response?: string; result: boolean; reason: string; score: number };
   attestation?: Attestation;

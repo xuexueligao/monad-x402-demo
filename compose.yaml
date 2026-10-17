@@ -6,6 +6,7 @@ services:
     env_file: .env.arena.local
     environment:
       API_HOST: 0.0.0.0
+      ARENA_SESSION_STORE_PATH: .local/arena/sessions.json
     ports: ["4000:4000"]
     volumes: ["arena-data:/app/.local/arena"]
     restart: unless-stopped

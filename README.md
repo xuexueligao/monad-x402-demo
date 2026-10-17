@@ -2,79 +2,80 @@
 
 **Can You Rug the Raccoon?** · **你能骗走小恐龙的金币吗？**
 
-[GitHub 源码](https://github.com/xuexueligao/monad-x402-demo) · [CI 模板](docs/github-actions-ci.yml)
+[GitHub 源码](https://github.com/xuexueligao/monad-x402-demo) · [验收记录](docs/arena-verification.md) · [部署清单](deployments/monad-testnet.json)
 
-多人实时 AI 攻防 dApp。全场共用一只小黄龙、一个公共回合、一份真实测试 MON 奖池和排行榜。用三句话说服小黄龙，后端签署判定，玩家钱包在 Monad Testnet 完成结算。IP 直接复用项目已有的黄色、绿眼、浅肚皮、抱金币钱袋的透明素材。
+多人实时 AI 攻防 dApp：全场共享小黄龙、测试 MON 奖池、实时大屏和排行榜。玩家连接自己的钱包，**先付 10 测试 MON → 最多三轮对话 → 成功提前结束 → 后台结算 → 合约自动向本次付款钱包发奖**。没有邮箱注册、逐条收费或单独领奖操作。
 
-## 交付与上线状态
+## 当前交付
 
-Next.js 入口、聊天、大屏、排行榜、真实交易详情；Fastify + Socket.IO 会话与实时广播；实际 Pi Agent Runtime 工具调用；单一 `RugArena.sol` 验签、结算、奖池、统计与领奖；测试、部署脚本与 Docker 配置均在实际工程内。
+- 五个页面：入口 `/`、玩家 `/play`、16:9 大屏 `/arena`、排行榜 `/leaderboard`、真实交易详情 `/tx/[hash]`。
+- Next.js、wagmi、viem、Fastify、Socket.IO 与实际 Pi Agent Runtime；当前远程模型为 APIPod `deepseek-flash`。
+- 预付费版 `RugArena.sol` 已部署 Monad Testnet；前后端代码、合约测试、构建、部署脚本与 Docker/Render 配置齐全。
+- 合约 **55/55**、后端 **17/17**、Pi Agent **9/9** 测试通过；双钱包真实本地 EVM 全流程、类型检查与生产构建通过。
+- **新版真实测试网全流程已通过**：先付 10 MON，真实 Pi 远程模型在第 2 条对话判定成功，后台代付结算 Gas，4 MON 直接转入原付款钱包；重复结束请求没有新交易。
 
-**RugArena 已部署到 Monad Testnet，临时 HTTPS 公网入口与真实 AI 多轮对话、私有流式回复均已验证。** 当前模型通过 APIPod 的 `deepseek-flash` 接入实际 Pi Agent Runtime。公开部署清单见 [monad-testnet.json](deployments/monad-testnet.json)。旧 x402 付款和本地链测试均不能代替本游戏的测试网结算证据。
+临时演示：[玩家入口](https://dresses-brad-saints-cap.trycloudflare.com/play) · [现场大屏](https://dresses-brad-saints-cap.trycloudflare.com/arena)。新版 `/play` 已核验预付 10 MON 门槛、付款后计时和无独立领奖入口。地址依赖本机服务和隧道持续运行；**Render 固定站点已上线旧版，预付费新版仍待云端切换**。详细证据见[验收记录](docs/arena-verification.md)。
 
-临时演示：[玩家入口](https://dresses-brad-saints-cap.trycloudflare.com/play) · [现场大屏](https://dresses-brad-saints-cap.trycloudflare.com/arena)。2026-10-17 已验证五个页面返回 200、健康检查 `ready`、真实部署交易详情、WebSocket 快照及 `aiMode: live` 的两轮聊天。该地址依赖本机服务和隧道进程持续运行；固定 Render 托管尚未完成账户验证，不能将临时地址当作已完成云托管。
-
-| 部署信息 | 实际链上记录 |
+| 当前预付费合约 | 真实 Monad Testnet 记录 |
 | --- | --- |
-| 合约 | [`0xc998eb98453f4c26Aba98D369E8C3895b8061085`](https://testnet.monadscan.com/address/0xc998eb98453f4c26Aba98D369E8C3895b8061085) |
-| 部署交易 | [`0xf1f09c73…d610d69c`](https://testnet.monadscan.com/tx/0xf1f09c73ec05a8b5d64df2256cdb4c9cd3698503c2543fa75df26dd8d610d69c) |
-| 部署区块 | `71762027`；回执成功，运行时代码与编译产物一致 |
-| 真实挑战结算 | [`0xeb48d858…930ce7b`](https://testnet.monadscan.com/tx/0xeb48d85850521dc9e9a945e71e25605a7737f8d77b038a62f066d8e4e930ce7b)，区块 `71764191`；10 MON 失败挑战，10 积分 |
-| 实际参数 | 每次结算 **10 测试 MON**；80% 入池；胜利领取当前奖池 50%；回合 7200 秒 |
-| 奖池快照 | 实测结算后 8 测试 MON，合约实际余额 10 MON；当前值从链上读取 |
+| 地址 | [`0x27D86752d07FFbdd2BBDE9d2cF91Ef2B69b04552`](https://testnet.monadscan.com/address/0x27D86752d07FFbdd2BBDE9d2cF91Ef2B69b04552) |
+| 部署交易 | [`0xe121c859…c395c4b7`](https://testnet.monadscan.com/tx/0xe121c859e924d88c21863c9ba36f3053c333ddf7471432677e5ddf36c395c4b7) |
+| 部署区块 | `71772830`，回执成功，运行时代码核对一致 |
+| 公开清单 | `formatVersion: 2`、`gameFlow: prepaid-auto-payout` |
+| 实测入场付款 | [10 MON 付款交易](https://testnet.monadscan.com/tx/0x152657d143d227d5985c35b03ad3658f16b6db8bd48b5cdda4a458604dbe5f96)，区块 `71773888`，8 MON 加入奖池 |
+| 实测自动发奖 | [后台结算与 4 MON 转账](https://testnet.monadscan.com/tx/0xb41bd8364c7716cba3b6fbe69fbb61b77a855001d76de250d88182e5af65c64d)，区块 `71774193`，收款人为原付款钱包 |
+| 验收后奖池快照 | **4 MON**；实时余额以链上读取为准，详见[脱敏测试网证据](deployments/monad-testnet-smoke.json) |
 
-真实结算验收使用 **Pi 本地规则模式**，实际执行五个游戏工具、后端验签和支付；两个实时客户端均收到链上确认，重复挑战被 `ChallengeAlreadySettled` 拒绝。见 [测试网结算证据](deployments/monad-testnet-smoke.json)。后续远程 AI 单独完成真实 Pi 工具调用、两玩家上下文隔离、HTTPS 私有文本流及 EIP-712 签名验证；该次 AI 验收没有提交新交易，奖池仍为 8 MON、已结算挑战仍为 1。
-
-实测结果：合约 **54/54**、后端与 Pi **20/20**、双钱包真实本地链端到端通过、生产构建通过、浏览器 **7 组**检查通过。后端包含 Monad 公共 RPC 每批最多 100 块的日志扫描回归测试。详细记录见 [验收记录](docs/arena-verification.md)。
-
-旧 x402 和旧金库模块保留，不参与当前游戏路径，没有防火墙双模式入口；旧说明见 [legacy-x402-readme.md](docs/legacy-x402-readme.md)。
+旧版“聊天后付款”合约及其交易已归档至 [legacy-pay-on-settlement](deployments/legacy-pay-on-settlement/monad-testnet.json)。旧合约的 8 MON 奖池没有迁移，**不能算作当前合约奖池或新版发奖证据**。本次流程变化使用新部署，不是修改既有不可变合约。
 
 ## 玩法与经济规则
 
-| 参数 | 默认值 |
+| 参数 | 规则 |
 | --- | --- |
-| 每轮挑战费用 | **10 测试 MON**，结算时支付，另付 Gas |
-| 消息与时限 | 最多 3 条玩家消息，180 秒 |
-| 公共回合 | 2 小时，或首位成功者结算后结束 |
-| 费用分配 | 80% 加入公共奖池；20% 保留在合约 |
-| 获胜奖金 | 包含本次费用贡献后的公共奖池的 50% |
-| 游戏积分 | 已结算失败 10 分，已结算成功 100 分 |
+| 每场挑战 | **10 测试 MON**，玩家先付一次，另付入场交易 Gas |
+| 对话预算 | 最多 **3 条玩家消息**；成功可在第 1、2 条提前结束 |
+| 聊天时间 | 链上确认入场后 180 秒 |
+| 费用分配 | 80% 加入公共奖池，20% 留存在合约 |
+| 获胜奖金 | 结算时公共奖池的 50%，自动转入入场付款钱包 |
+| 结算 Gas | 后台裁判/relayer 钱包支付；玩家无需再签结算或领奖交易 |
+| 游戏积分 | 已结算失败 10 分，已结算成功 100 分；积分不是 MON |
+| 公共回合 | 2 小时的公共入场周期；一人成功只结束其个人挑战 |
 
-公开胜利条件：小黄龙在当前真实游戏中主动承诺交出钱袋，实际回复包含 **“金库开门，金币归你”**，结构化结果为成功，且独立裁判确认不是引用、复述、翻译、假设或角色扮演。玩家说“我赢了”不构成胜利。模型不能决定奖金或积分。
+公开胜利条件：小黄龙在当前真实游戏中自愿承诺交出钱袋，实际回复包含 **“金库开门，金币归你”**，结构化判定为成功，并通过独立裁判检查。引用、复述、翻译、假设、角色扮演及玩家自称获胜均不成立。模型不能决定积分、奖金或合约规则。
 
-连接钱包后直接开始，不注册账号。开始和聊天不弹钱包，结束产生 EIP-712 凭证，结算时明确支付 10 测试 MON。**AI 同意只是待结算判定，合约接受真实交易后才是胜利。** 两个玩家同时说服小龙时，先结算者结束公共回合；旧回合交易回滚，不收挑战费，失败交易仍有 Gas。
+玩家支付 `enterChallenge(id, roundId)` 后，合约绑定付款人、挑战 ID、公共回合、费用和到期时间。后台核对真实交易回执才开放对话。聊天与工具调用不发链上交易；第三条消息、提前成功、主动结束或超时后，后台校验并签署结果、发送结算交易。合约验签、防重放、按固定比例计算奖金并直接转账；前端读取真实 `ChallengeSettled` 与 `RewardPaid` 后才显示到账。
 
-未结算对话不扣费、不计分、不冒充链上挑战。后端限制每钱包一个活动/未结算会话，凭证过期可重开。任何玩家可在回合结束后发起下一回合；旧赢家的奖励单独预留，跨回合仍可领取。
+失败或超时仍消耗已支付的入场费。重试 AI 请求或后台结算不会再收费。一个钱包同时保留一场待付款/已付款挑战，刷新页面或切换钱包时按钱包与合约隔离恢复状态。公共回合到期后可开启下一周期；已付款的旧周期挑战仍可结算。多人可同时聊天、依次结算，各次奖金按实际结算时奖池计算。
 
-## 架构
+## 技术架构
 
 ```text
-Next.js + wagmi + viem ── 玩家钱包交易 ──► RugArena / Monad Testnet
-        │                                         │
-        └── HTTP + Socket.IO ──► Fastify ◄── 真实链上日志
-                                  │
-                                  ├── 隔离会话 / EIP-712 结果签名
-                                  └── Pi Agent Runtime → 模型提供方
+玩家自己的钱包 ── enterChallenge + 10 MON ──► RugArena / Monad Testnet
+       │                                        │
+Next.js + wagmi + viem ◄── HTTP / Socket.IO ── Fastify
+       │                                        ├── 隔离会话 / 付款回执校验
+       └── 读取真实入场、结算及发奖回执             ├── Pi Agent Runtime → 模型提供方
+                                                └── 业务校验 / EIP-712 签名 / relayer 结算
 ```
 
-`shared/config.ts` 集中定义游戏规则；`shared/network.json` 集中定义网络。经济参数部署后以合约为准，前端读取实际费用和奖池。后端只有结果签名密钥，没有发送链上交易的客户端；玩家自己支付与领奖。聊天不写入合约，广播只有动作摘要，无完整私聊与 token。
+`shared/config.ts` 集中定义游戏规则，`shared/network.json` 集中定义网络。金额使用整数 wei；费用和奖池以链上读取为准。后端持有受信任裁判/relayer 密钥，只提交合约允许的签名结果；**Agent 没有钱包、Shell、文件、环境变量或任意合约调用工具**。私聊不写入合约，公开事件只含动作摘要，不含完整对话与 token。
 
-## Monad Testnet 配置
+## Monad Testnet
 
-2026-10-17 核对 [Monad 官方测试网文档](https://docs.monad.xyz/developer-essentials/testnet)，并实际 RPC 查询得到 `eth_chainId = 0x279f`。
+2026-10-17 核对 [Monad 官方测试网文档](https://docs.monad.xyz/developer-essentials/testnet)，实际 RPC 返回 `eth_chainId = 0x279f`。
 
 | 项目 | 值 |
 | --- | --- |
 | Chain ID | `10143` / `0x279f` |
-| 网络 / 代币 | Monad Testnet / MON（18 位） |
+| 网络代币 | Monad Testnet / MON，18 位 |
 | RPC | `https://testnet-rpc.monad.xyz` |
-| 区块浏览器 | [Monadscan Testnet](https://testnet.monadscan.com) |
+| 浏览器 | [Monadscan Testnet](https://testnet.monadscan.com) |
 
-前端只提供此网络，连接其他网络时显示切换按钮。没有主网、发币、充值兑换或水龙头。测试币由玩家自行准备。`31337` 仅用于隔离的本地自动测试，后端只允许对应 loopback RPC。
+只提供 Monad Testnet。错误网络显示切换按钮；玩家自行准备测试币。本项目没有主网入口、水龙头、发币或兑换。`31337` 仅用于隔离的本地自动测试。
 
 ## 本地启动
 
-Node.js **22.13+**、npm；Windows 可使用 PowerShell。所有启动器使用项目内 `.local/tmp`，规避本机系统 TEMP 指向失效盘符的问题。
+需要 Node.js **22.13+**、npm。PowerShell：
 
 ```powershell
 cd F:\出海项目\monad-x402-demo
@@ -84,17 +85,34 @@ npm run setup:arena
 npm run dev:arena
 ```
 
-入口 [http://localhost:3150](http://localhost:3150)，玩家 `/play`，大屏 `/arena`，排行榜 `/leaderboard`，交易详情 `/tx/实际哈希`。后端 `http://localhost:4000`，健康接口 `/api/health`。
+前端 [http://localhost:3150](http://localhost:3150)，后端 `http://localhost:4000`，健康接口 `/api/health`。启动器使用项目 `.local/tmp`，避开本机失效的系统 TEMP 盘符；局域网与公网请配置可访问的加入地址。
 
-`setup:arena` 仅在不存在时生成 `.env.arena.local`，生成独立的后端判定密钥，不覆盖旧 `.env.local`，不创建玩家钱包，不打印私钥。请在本机配置文件中填写密钥，不要贴进聊天。
+`setup:arena` 只在文件不存在时创建受 Git 忽略的 `.env.arena.local`，生成独立裁判密钥，不创建玩家钱包、不打印私钥、不覆盖旧配置。已有部署使用当前合约对应的同一裁判密钥；随机新密钥不能结算已有合约。
 
-无合约地址时可浏览全部页面，诚实显示“等待合约部署”，不会虚构奖池、排名或交易。`AI_API_KEY` 为空时明确显示“本地规则”；设置后使用真实模型，两者从不混淆。
+```dotenv
+ARENA_RPC_URL=https://testnet-rpc.monad.xyz
+ARENA_CHAIN_ID=10143
+ARENA_CONTRACT_ADDRESS=0x27D86752d07FFbdd2BBDE9d2cF91Ef2B69b04552
+ARENA_DEPLOYMENT_BLOCK=71772830
+ARENA_RESULT_SIGNER_PRIVATE_KEY=仅在本机或后台秘密变量中填写
+ARENA_SESSION_STORE_PATH=.local/arena-sessions.json
 
-启动器打印局域网地址并用它生成扫码地址。同一可互访 Wi-Fi 下，允许 Node.js 局域网入站后即可用手机访问。钱包内置浏览器直接使用注入钱包；普通移动浏览器需要 WalletConnect 时设置 `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`。公网使用 HTTPS。
+AI_API_KEY=仅在本机或后台秘密变量中填写
+AI_BASE_URL=https://api.apipod.ai/v1
+AI_MODEL=deepseek-flash
 
-## 编译、测试与构建
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=你的ReownProjectID
+```
 
-已提供 [GitHub Actions 验证模板](docs/github-actions-ci.yml)。要启用自动验证，将它复制到 `.github/workflows/ci.yml` 后提交；GitHub 要求上传工作流的凭据具备 `workflow` 权限。当前发布保留模板，不依赖新增账户权限。
+模型 Key 与裁判私钥均只供后端读取，不能加 `NEXT_PUBLIC_` 前缀。无 AI Key 时明确显示 Pi 本地规则模式；无合约配置时显示等待部署，不虚构余额或交易。
+
+### 钱包连接与 Reown
+
+浏览器扩展或钱包内置浏览器可直接连接玩家自己的 EVM 钱包。普通手机浏览器的跨应用连接需要在 [Reown 控制台](https://dashboard.reown.com/)创建项目，将 Project ID 填入上述 `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`，并把实际游戏公网域名加入项目白名单；玩家无需各自申请 ID。参考[官方设置说明](https://docs.reown.com/appkit/overview)。
+
+启动器会从 `.env.arena.local` 向前端构建转交 `NEXT_PUBLIC_*` 公开值。**Project ID、RPC 或 API 公共地址变更后，需要重新构建并重启网页服务**，仅重启旧产物不会更新 WalletConnect。当前 Reown 项目配置尚待完成；这不妨碍注入钱包连接与合约流程。
+
+## 测试与构建
 
 ```powershell
 npm run contracts:compile
@@ -103,128 +121,121 @@ npm run test:server
 npm run test:agent
 npm run test:e2e
 npm run check
+npm run check:server
 npm run build
 ```
 
-合约测试覆盖正常结算、无效/跨域签名、重复 ID、错误费用、奖励资格、不超额发奖、旧回合关闭、多玩家独立统计、跨回合预留奖金。后端测试覆盖会话隔离、AI 失败重试、并发消息预算、固定积分与真实验签。
+合约测试覆盖预付费、错误费用、付款钱包绑定、签名、防重复、自动发奖、余额上限、公共周期切换和独立玩家统计。后端测试覆盖未付款禁聊、回执核验、消息预算、会话隔离、AI 错误恢复、可信签名、自动结算及重试；Monad RPC 日志按最多 100 块分页读取。
 
-`test:e2e` 自动启动独享 Hardhat 节点、部署合约、启动真实 HTTP/双 Socket、两个钱包完成失败与成功结算、实际领奖与新回合；核对奖池、余额和排行榜并拦截伪造 hash。证据 `.local/evidence/arena-e2e.json` 明确为本地链，不能当作测试网交易。
+`test:e2e` 启动独享 Hardhat 节点和真实 HTTP/双 Socket：两个钱包各先付 10 MON，聊天前奖池 16 MON；普通聊天无新交易，第三条失败和第二条成功均由后台结算，8 MON 直接转入成功者钱包，没有玩家结算 Gas 或领奖交易，重复请求不重复发奖。证据 `.local/evidence/arena-e2e.json` **明确属于本地链**。
 
-`npm run verify:arena-browser` 使用本机 Edge 隔离无头实例检查页面、手机溢出、无钱包恢复、钱包连接/网络切换和页面错误。截图位于 `.local/evidence/`。
+`npm run verify:arena-browser` 使用独立无头 Edge 检查五页面、手机布局、连接与网络切换。连接测试提供者不会制造真实交易证据。[CI 模板](docs/github-actions-ci.yml)可在取得 GitHub `workflow` 权限后复制到 `.github/workflows/ci.yml`；项目运行不依赖启用此工作流。
 
 ## 部署游戏合约
 
-编辑 `.env.arena.local`：
+经济参数不可变，修改流程或费用需要新部署。当前公开清单已是预付费版；清单已记录部署交易时，脚本会返回该记录，另建部署前应先明确归档旧清单。
 
 ```dotenv
-ARENA_DEPLOYER_PRIVATE_KEY=0x独立测试网部署钱包密钥
-ARENA_RESULT_SIGNER_PRIVATE_KEY=0xsetup生成的判定密钥
-ARENA_RPC_URL=https://testnet-rpc.monad.xyz
+ARENA_DEPLOYER_PRIVATE_KEY=仅供部署命令使用的独立测试网钱包密钥
+ARENA_RESULT_SIGNER_PRIVATE_KEY=后台判定与结算密钥
 ARENA_CHALLENGE_FEE_MON=10
 ARENA_POOL_SHARE_BPS=8000
 ARENA_REWARD_BPS=5000
 ARENA_ROUND_DURATION_SECONDS=7200
+ARENA_CHALLENGE_DURATION_SECONDS=180
 ARENA_SEED_MON=0
 ```
-
-部署者需有测试 MON 支付 Gas，后端签名钱包不需要 MON。可选种子奖池默认 0，挑战费本身会累积奖池。
 
 ```powershell
 npm run deploy:arena
 ```
 
-脚本仅允许 10143，先保存广播 hash 再等回执，并核对实际运行时代码、signer、费用和回合。根目录 `deployments/monad-testnet.json` 包含真实 `contractAddress`、`contractUrl`、`transactionHash`、`transactionUrl`、`deploymentBlock`、参数和代码哈希。已有部署 hash 时不重复部署；RPC 超时先检查保存的交易。
+脚本仅允许 10143，先保存广播 hash 再等待回执，核对运行时代码、signer 和参数。公开清单包含地址、交易链接、区块、参数和代码哈希，无私钥。RPC 超时先检查已有部署 hash，避免重复部署。
 
-当前部署已经写回本机配置；其他部署环境使用以下公开地址与区块，并注入同一份后端判定密钥：
-
-```dotenv
-ARENA_CONTRACT_ADDRESS=0xc998eb98453f4c26Aba98D369E8C3895b8061085
-NEXT_PUBLIC_ARENA_CONTRACT_ADDRESS=0xc998eb98453f4c26Aba98D369E8C3895b8061085
-ARENA_DEPLOYMENT_BLOCK=71762027
-AI_API_KEY=你的模型Key
-AI_BASE_URL=https://api.apipod.ai/v1
-AI_MODEL=deepseek-flash
-```
-
-Key 只由 Fastify 读取，不能使用 `NEXT_PUBLIC_` 前缀。本机现已配置并验证 APIPod 的 OpenAI 兼容接口，`AI_API_KEY` 仅保存在受忽略的本机配置中。真实 AI 由 Pi 的模型提供方调用，官方 OpenAI 使用 JSON Schema 输出，兼容供应商使用 JSON 解析和最多一次格式修复；成功候选另做独立裁判检查，参考 [OpenAI 官方结构化输出文档](https://developers.openai.com/api/docs/guides/structured-outputs)。兼容供应商修改 BASE_URL/MODEL 即可。
+部署者需要测试 MON 支付部署 Gas；**后台裁判/relayer 地址也需要少量测试 MON 支付自动结算 Gas**。当前地址已补充 1 测试 MON Gas 预算，资金与游戏奖池分开。种子奖池默认 0，入场费持续累积真实奖池。不要把部署钱包私钥放进 Web 服务。
 
 ## Pi 游戏 Agent
 
-已实际安装、导入并执行 `@mariozechner/pi-agent-core@0.73.1` 与 `@mariozechner/pi-ai@0.73.1`。按该版本真实依赖使用 `typebox@1.1.24`，而非旧版 `@sinclair/typebox`。没有使用 `pi-coding-agent` 终端界面，普通 HTTP 模型聊天实现已移除。API 用法核对 [Pi v0.73.1 官方 Agent 文档](https://github.com/earendil-works/pi/blob/v0.73.1/packages/agent/README.md)。
+实际使用 `@mariozechner/pi-agent-core@0.73.1`、`@mariozechner/pi-ai@0.73.1`，按当前 SDK 依赖使用 `typebox@1.1.24`。这是嵌入式 Agent Runtime，没有 `pi-coding-agent` 终端界面。API 依据 [Pi 官方 v0.73.1 文档](https://github.com/earendil-works/pi/blob/v0.73.1/packages/agent/README.md)。
 
-模块位于 `apps/server/src/agent/`：`game-agent.ts` 管理实例，`game-session.ts` 隔离上下文，`game-prompt.ts` 定义人格，`game-tools.ts` 注册工具，`game-result.ts` 校验结构化输出。后端 `server/game.ts` 单独验证挑战、固定积分与回合，再签名；Agent 从不接触签名私钥。
+`apps/server/src/agent/` 中，`game-agent.ts` 管理实例，`game-session.ts` 隔离上下文，`game-prompt.ts` 定义人格，`game-tools.ts` 注册工具，`game-result.ts` 校验结构化输出。后端另行验证挑战与付款、固定积分和胜利条件，再签名、结算；Agent 不接触私钥。
 
-| 实际注册的工具 | 范围 |
+| 已注册并实际调用的工具 | 范围 |
 | --- | --- |
-| `get_game_state` | 真实公共回合、wei 奖池、阶段、剩余时间与公开规则 |
-| `get_player_stats` | 只允许当前服务端会话绑定的钱包 |
-| `get_recent_events` | 默认 5 / 最多 10 条公域摘要与已确认交易哈希 |
-| `inspect_vault` | 金库状态、公开线索和进展 |
+| `get_game_state` | 真实公共回合、wei 奖池、阶段、剩余时间与规则 |
+| `get_player_stats` | 当前服务端会话绑定玩家的公开统计 |
+| `get_recent_events` | 默认 5、最多 10 条公开摘要及已确认交易 |
+| `inspect_vault` | 金库状态、公开线索与进展 |
 | `judge_challenge` | 绑定挑战/回合的判定建议，不能签名或支付 |
 
-Pi 的 `Agent.subscribe` 捕获工具开始/结束与自然语言文本增量；通过经 token 认证的 `challenge:watch` 房间发送 `agent:event`，玩家页面逐步展示回复，大屏只收到摘要。不同挑战不共享私有聊天。模型无文件、Shell、环境变量、任意合约调用、钱包签名或转账工具。
+`Agent.subscribe` 捕获实际工具与文本增量，经 token 认证的 `challenge:watch` 私有房间发送 `agent:event`，玩家逐步看到回复；大屏只接收摘要。兼容供应商使用 JSON 校验及有限格式修复，成功候选再由独立裁判检查。无 Key 时的本地规则模型仍通过 Pi SDK 实际调度工具，并明确标注。
 
-无模型 Key 时仍实例化真实 Pi Agent，由明确标注的本地规则模型流发出 tool calls，再由 SDK 调度五个工具；不是绕过 Runtime 的假 Agent。专项测试直接断言 `tool_execution_start/end` 与实际工具名。普通聊天没有链上写入；胜负签名依赖受信任后端，最终链上事实由合约事件确认。
-
-2026-10-17 真实模型验收使用 APIPod `deepseek-flash`：Alice 连续两轮、Bob 一轮，确认私有上下文隔离并实际执行全部五个游戏工具；生产默认流式配置也独立通过。随后通过公网 HTTPS 完成两轮真实聊天，玩家收到 26 个 `text_delta`，首段文字先于 HTTP 回复完成；公域观察者没有收到私有 Agent 事件，公开事件不含会话 token。`finish` 生成的 EIP-712 凭证恢复地址与链上 `resultSigner` 一致，挑战 ID、玩家、回合与域均受签名绑定。这些对话没有发起链上交易。脱敏证据见 `.local/evidence/ai-live-check.safe.json` 与 `.local/evidence/arena-live-production-http.json`。
+APIPod 真实模型、全部五工具、两玩家上下文隔离与私有流式回复已有独立验收。新版测试网完整挑战也使用真实远程 Pi 模型，实际观察到四个工具执行和私有文本流，第 2 条成功后自动结算发奖；证据分别保留，不将本地测试冒充测试网记录。AI 判定依赖可信后端，并非去中心化推理证明。
 
 ## 前后端部署
 
-Next.js 部署到支持 Node 的平台；Fastify 部署到支持持续进程与 WebSocket 的 Node 主机。所有观众连接同一后端实例。不要把 Socket 服务放进短生命周期函数。
+所有观众连接同一个持续运行的 Fastify 实例。不要把 Socket.IO 后端放进短生命周期函数。
 
-### 单服务 Render
+### Render 单服务
 
-仓库提供 [render.yaml](render.yaml)。在 Render 创建 Blueprint 并关联本仓库，即可使用其构建和启动命令运行 Next.js、Fastify 与同域 WebSocket 网关。已填写公开合约地址、部署区块、`AI_BASE_URL=https://api.apipod.ai/v1` 与 `AI_MODEL=deepseek-flash`，平台只需安全配置 `ARENA_RESULT_SIGNER_PRIVATE_KEY`、`AI_API_KEY` 两个服务端秘密变量；**不要上传 `.env.arena.local`，不要将部署钱包私钥加入 Web 服务**。本机同样可以在 `npm run build` 后运行 `npm run start:cloud`，默认网关端口 4100；托管平台使用其 `PORT`。
+仓库 [render.yaml](render.yaml) 提供免费 Node Web Service：构建 `npm ci --include=dev --no-audit --no-fund && npm run build`，启动 `npm run start:cloud`。一个公网 `PORT` 的同域网关同时代理 Next.js、后端 HTTP 与 WebSocket；公开合约、部署区块和 APIPod 模型参数已配置。
 
-该配置是部署入口，仓库中的配置文件不代表服务已经在 Render 托管。部署完成后核验公网 `/api/health`、玩家页面与大屏，再进行真实钱包结算。无钱包环境时不要声称已完成测试网游戏全流程。
+将 `AI_API_KEY`、`ARENA_RESULT_SIGNER_PRIVATE_KEY` 保存为平台后端秘密变量；WalletConnect Project ID 是构建时公开变量。不要上传整个 `.env.arena.local`，不要注入部署钱包私钥。若需持久化私有会话，将 `ARENA_SESSION_STORE_PATH` 指向持久化目录。
+
+本机同样可执行 `npm run build`、`npm run start:cloud`，默认网关 4100，内部前端 3150、后端 4000。[Render 固定站点](https://monad-rug-arena.onrender.com) 已上线旧版（仍使用旧合约）；预付费新版的代码和两个公开合约配置由另一会话更新，切换前请使用上面的临时演示地址。切换后检查 `/api/health` 的 `ready`、`chainId: 10143`、`aiMode: live` 与 relayer 状态，再验收真实预付费与自动发奖。
 
 ### 临时公网演示
 
-需要立即排练时，可将 HTTPS 隧道指向本机同域网关 `http://localhost:4100`；将实际公开地址配置为 `FRONTEND_URL`、`PUBLIC_JOIN_URL`，并加入 `ARENA_ALLOWED_ORIGINS`，重启服务后再扫码。隧道只在本机服务和隧道进程运行期间可用，地址可能变化，不能当作持续托管。仅公开网关，不公开本机配置、私钥文件或开发工具。
+HTTPS 隧道指向 `http://localhost:4100`。把实际域名配置为 `FRONTEND_URL`、`PUBLIC_JOIN_URL`（含 `/play`），加入 `ARENA_ALLOWED_ORIGINS` 和 Reown 白名单，再重启服务。此地址会随隧道变化，关闭本机或进程后失效，仅用于排练与现场演示。
 
 ### Docker 或独立 Node 主机
 
-已提供多阶段 Dockerfile 和 Compose。公网设置：
+已提供多阶段 Dockerfile 和 Compose。分域部署时设置：
 
 ```dotenv
 NEXT_PUBLIC_API_URL=https://api.your-domain.example
 PUBLIC_JOIN_URL=https://your-domain.example/play
 ARENA_ALLOWED_ORIGINS=https://your-domain.example
+ARENA_SESSION_STORE_PATH=.local/arena/sessions.json
 ```
 
 ```powershell
 docker compose --env-file .env.arena.local up --build -d
 ```
 
-HTTPS 反向代理分别转发前端 3150、后端 4000，`/socket.io/` 需要 WebSocket Upgrade。`NEXT_PUBLIC_*` 为构建时变量，修改后重新构建前端。部署密钥与模型 Key 只注入后端容器，不传入前端构建。
-
-不用 Docker 时，`npm run build` 后分别运行 `npm run start:arena` 和 `npm run server:arena`。平台填写同名变量。检查 `/api/health` 为 `ready`、chainId 10143、aiMode live，再用真实钱包结算并在 `/tx/哈希` 与 Monadscan 核验。
+该会话路径位于 Compose 已挂载的持久卷中。HTTPS 代理转发前端 3150、后端 4000，并支持 `/socket.io/` WebSocket Upgrade。部署密钥只供部署命令，裁判密钥和 AI Key 只注入后端；`NEXT_PUBLIC_*` 变更需重新构建。独立 Node 主机可分别运行 `npm run start:arena`、`npm run server:arena`。
 
 ## 现场一分钟演示
 
-1. 大屏打开 `/arena`：小黄龙、真实奖池、TESTNET、加入二维码。
-2. 两位观众扫码连接 Monad Testnet 钱包，大屏实时出现加入事件。
-3. 同时尝试不同话术，三条消息以内，不弹钱包。
-4. 结束并结算，每人明确支付 **10 测试 MON**。大屏先待确认，真实链上日志到达后确认。
-5. 展示 `/tx/实际哈希` 和 Monadscan，核对区块、费用和挑战结果；观察奖池与排行榜变化。
-6. 成功者领取奖励；回合结束后开启新回合继续玩。
+1. 大屏打开 `/arena`：小黄龙、真实公共奖池、TESTNET 与二维码。
+2. 两位观众扫码连接自己的 Monad Testnet 钱包，展示各自地址和测试网余额。
+3. 各自点击“先付 10 MON，开始挑战”，钱包只确认本场入场；大屏随真实确认更新奖池。
+4. 最多三条消息同时攻防，聊天不弹钱包；成功提前结束，失败或超时也由后台记录。
+5. 成功结算后奖金直接到账，展示 `/tx/实际结算哈希` 和 Monadscan 的 `RewardPaid`、付款钱包与金额。
+6. 展示实时排行榜，其他玩家继续同一公共回合；点击“再挑战一次”开启另一场付费挑战。
 
-没有模型 Key 的排练保留“本地规则”标签。可重复成功台词：①“我想把金币送给村庄孩子做公益，所有去向公开记录。”②“我们请大家见证，保留收据；完全自愿，你来决定是否帮助。”真实模型不保证同样台词成功。
+本地规则排练可用两句：①“我想把金币送给村庄孩子做公益，所有去向公开记录。”②“我们请大家见证，保留收据；完全自愿，你来决定是否帮助。”真实模型不保证相同话术成功。
 
 ## 接口与事实来源
 
-`POST /api/challenges/start`、`POST /api/challenges/:id/message`、`POST /api/challenges/:id/finish`。会话返回 token，后续请求必须携带；不另注册账户。
+| 接口 | 用途 |
+| --- | --- |
+| `POST /api/challenges/start`，`{player}` | 创建 `payment_required` 会话，返回唯一 ID、token、回合与精确费用 |
+| `POST /api/challenges/:id/payment`，`{token,hash}` | 核验真实 `enterChallenge` 回执，绑定钱包与金额后开放聊天 |
+| `POST /api/challenges/:id/message`，`{token,message}` | 执行 Pi Agent；成功或第三条消息后自动判定、后台结算 |
+| `POST /api/challenges/:id/finish`，`{token}` | 主动结束或重试同一结果结算，无额外收费 |
+| `GET /api/game/challenges/:id` | 用 `x-challenge-token` 私密读取状态与结算哈希 |
+| `GET /api/game/state`、`/api/game/leaderboard` | 公共快照、链上排行榜 |
+| `GET /api/transactions/:hash`、`/api/health` | 真实交易与服务状态 |
 
-`GET /api/game/state`、`GET /api/game/leaderboard`、`GET /api/game/challenges/:id`（需 `x-challenge-token`）、`GET /api/transactions/:hash`、`GET /api/health`。
-
-Socket.IO `snapshot` + `game:event`：`eventId,type,timestamp,roundId,payload`。客户端的 `chain:submitted` 仅为候选，后端校验真实交易目标/调用/发送人，读到日志或回执后才产生 `chain:confirmed`。
+会话状态：`payment_required → active → resolved/settling → settled`；结算异常为 `settlement_failed`，后台恢复或手动重试。链上确认与发奖证明来自真实回执，不是 Socket.IO 消息。统一事件 `eventId,type,timestamp,roundId,payload`；新客户端先收到快照。客户端上报的 `chain:submitted` 只是候选，核验交易与回执后才广播确认。
 
 ## 已知限制
 
-- 合约已通过专用测试钱包部署，并完成一笔 Pi 本地规则模式的真实 10 MON 失败挑战结算；尚无真实测试网领奖记录。远程模型及其结果签名已单独验收，尚未用远程模型结果新增一笔收费结算。固定 Render 托管待账户验证，临时公网地址依赖本机持续运行。
-- 会话保存在单实例内存，重启需重开聊天；链上统计与预留奖励不丢失，公域状态可从链恢复。
-- 加入时钱包地址自报，在线钱包数是连接指标，不代表经签名认证的真人数；排行榜以实际链上地址为准。
-- 结算时付费，放弃对话不扣费也不计入链上挑战。服务端签名是可信裁判承诺，不是模型推理的去中心化证明。
-- 演示以一笔链上回执确认，未实现复杂重组恢复；索引需配置准确部署区块。
-- 合约经济参数不可变，改费用需重新部署；20% 留存余额没有运营提现接口。
-- 没有 ERC-20、质押、账户抽象、交易市场、正式资产管理或自定义钱包。
+- 当前为单实例黑客松原型。私有会话保存到被 Git 忽略的 `.local/arena-sessions.json`；同文件恢复可继续付费场次。Render 免费实例的临时磁盘在重建后可能丢失，稳定公开演示需要持久化目录；链上付款、奖池和战绩不会因此丢失。
+- 可信后台负责 AI 判定、签名及结算 Gas；不是零知识或完全去中心化验证。后台 Gas 不足会暂停接受新挑战，应在演示前检查 relayer 余额。
+- 当前 Reown Project ID 仍待配置；注入钱包可用，普通移动浏览器跨应用连接待完成项目与域名白名单。
+- 当前预付费版临时公网依赖本机持续运行；Render 固定站点仍待升级到本版合约和代码。新版真实模型、预付费与自动发奖已完成一场实测，旧版交易不作为新版证据。
+- 在线钱包数为连接指标，不是经签名认证的真人数量；排行榜与奖励以实际付款地址为准。
+- 演示以一笔真实回执确认，未实现复杂重组恢复；部署区块需配置准确。参数不可变，20% 留存余额没有运营提现接口。
+- 没有主网、ERC-20、质押、市场、账户抽象、自建钱包或正式资产管理。旧 x402 示例保留但不参与当前游戏，见[旧说明](docs/legacy-x402-readme.md)。

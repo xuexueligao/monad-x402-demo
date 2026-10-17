@@ -40,3 +40,6 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.dragon-react .dragon-art{translate:none}}
 
 .dragon-stage .stage-halo{left:0;right:0}
+
+.paid-session-note{display:flex;align-items:center;gap:7px;padding:9px 11px;margin:0 0 21px;border:1px solid #98e5be20;border-radius:7px;background:#98e5be06;color:var(--mint);font-size:9px}.paid-session-note>span{flex:1}.paid-session-note>a{display:grid;place-items:center;padding:3px}.payment-tx-link{display:flex;justify-content:center;margin:0 0 16px}.chat-welcome>.button-quiet{margin:15px auto 0}.phase-payment_pending,.phase-payment_verifying,.phase-settling{color:var(--gold)}.phase-settlement_failed,.phase-payment_failed{color:var(--red)}.phase-confirmed{color:var(--mint)}
+@media(max-width:600px){.paid-session-note{font-size:8px;padding:8px 9px}.play-balance{font-size:7px}.welcome-terms{line-height:2}}

@@ -1,39 +1,46 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 import { decodeEventLog, type Abi, type Address, type Hash, type TransactionReceipt } from 'viem';
 import arenaAbi from '../../contracts/abi/RugArena.json';
+import { GAME_RULES } from '../../shared/config';
 import { api } from './api';
 import { useArena } from './arena-context';
 import { monad } from './wagmi';
-import type { ChallengeSession, Attestation, GameSnapshot } from './types';
-import { GAME_RULES } from '../../shared/config';
+import type { ChallengeSession, GameSnapshot } from './types';
 
-export type ChallengePhase = 'idle' | 'starting' | 'active' | 'thinking' | 'resolved' | 'signing' | 'submitting' | 'confirmed' | 'failed';
-type PendingAction = { kind: 'claim' | 'round'; hash: Hash; roundId?: string };
-type ChainRound = { id: bigint; prizePool: bigint; challengeFee: bigint; endsAt: bigint; active: boolean; winner: Address; reward: bigint; rewardClaimed: boolean };
+export type ChallengePhase = 'idle' | 'starting' | 'payment_required' | 'signing' | 'payment_pending' | 'payment_verifying' | 'payment_failed' | 'active' | 'thinking' | 'resolved' | 'settling' | 'confirmed' | 'settlement_failed';
+type ChainRound = { id: bigint; challengeFee: bigint; endsAt: bigint; active: boolean };
+type SavedChallenge = { session?: ChallengeSession; paymentHash?: Hash; roundHash?: Hash };
 const abi = arenaAbi as Abi;
 const validHash = (value: unknown): value is Hash => typeof value === 'string' && /^0x[\da-f]{64}$/i.test(value);
-const publicRound = (round: ChainRound): GameSnapshot['round'] => ({ ...round, id: String(round.id), prizePool: String(round.prizePool), challengeFee: String(round.challengeFee), endsAt: Number(round.endsAt), reward: String(round.reward) });
+const phaseFor = (session: ChallengeSession): ChallengePhase => {
+  if (session.status === 'payment_required') return session.paymentHash ? 'payment_pending' : 'payment_required';
+  if (session.status === 'active') return 'active';
+  if (session.status === 'settlement_failed') return 'settlement_failed';
+  // Even a server-confirmed result is checked against the actual receipt below.
+  return session.settlementHash || session.status === 'settling' || session.status === 'settled' ? 'settling' : 'resolved';
+};
 const explain = (cause: unknown) => {
   const message = cause instanceof Error ? cause.message : String(cause);
-  if (/reject|denied|4001/i.test(message)) return '已取消签名，本轮结果已保留，可以再次结算。';
-  if (/insufficient funds|exceeds the balance/i.test(message)) return '测试 MON 余额不足，请确认钱包中有挑战费和 Gas。';
-  if (/RoundClosed|WrongRound|RoundNotActive|round.*(ended|active)|RoundMismatch/i.test(message)) return '这一公共回合已经结束，本轮未扣挑战费。可以加入下一回合。';
-  if (/deadline|expired/i.test(message)) return '结算凭证已过期，请重新结束本轮以获取凭证。';
+  if (/reject|denied|4001/i.test(message)) return '已取消钱包操作，尚未支付挑战费。可以再次开始。';
+  if (/insufficient funds|exceeds the balance/i.test(message)) return '你的测试 MON 余额不足，需要本场挑战费和少量 Gas。';
+  if (/RoundClosed|WrongRound|RoundNotActive|RoundMismatch|round.*(ended|active)/i.test(message)) return '公共回合已结束，请开启新回合后再支付。';
+  if (/ChallengeExpired|challenge.*expired/i.test(message)) return '本场聊天时间已结束，可以结束对话并结算。';
   return message.split('\n')[0].slice(0, 190);
 };
-
 function findEvent(receipt: TransactionReceipt, contract: string, name: string, matches: (args: Record<string, unknown>) => boolean) {
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== contract.toLowerCase()) continue;
     try {
       const event = decodeEventLog({ abi, data: log.data, topics: log.topics }) as unknown as { eventName: string; args: Record<string, unknown> };
       if (event.eventName === name && matches(event.args)) return event.args;
-    } catch { /* Only the expected arena event confirms this action. */ }
+    } catch { /* Only this contract's expected event confirms an action. */ }
   }
 }
 
+/** One wallet payment opens one isolated challenge. Only the backend relays its result. */
 export function useChallenge() {
   const { address, chainId } = useAccount();
   const { state, refresh, reportTransaction } = useArena();
@@ -42,137 +49,165 @@ export function useChallenge() {
   const [session, setSession] = useState<ChallengeSession | null>(null);
   const [phase, setPhase] = useState<ChallengePhase>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [claimHash, setClaimHash] = useState<string | null>(null);
-  const [claiming, setClaiming] = useState(false);
-  const [rewardRoundIds, setRewardRoundIds] = useState<string[]>([]);
-  const [rewardRound, setRewardRound] = useState<GameSnapshot['round'] | null>(null);
-  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [paymentHash, setPaymentHash] = useState<Hash | null>(null);
+  const [roundHash, setRoundHash] = useState<Hash | null>(null);
+  const [actualReward, setActualReward] = useState('0');
+  const [confirmedSuccess, setConfirmedSuccess] = useState(false);
   const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const busy = useRef(false);
   const operation = useRef(0);
-  const pendingActionRef = useRef<PendingAction | null>(null);
-  const settlementRef = useRef<string | null>(null);
-  const storageKey = address && state?.contractAddress ? `rug-arena:${monad.id}:${state.contractAddress}:${address.toLowerCase()}` : null;
+  const storageKey = address && state?.contractAddress ? `rug-arena:prepaid-v1:${monad.id}:${state.contractAddress}:${address.toLowerCase()}` : null;
   const scope = useRef(storageKey);
   scope.current = storageKey;
-
+  const activeSession = useRef(session);
+  activeSession.current = session;
+  const confirmedId = useRef<string | null>(null);
+  const applySession = useCallback((next: ChallengeSession) => {
+    setSession(next);
+    if (validHash(next.paymentHash)) setPaymentHash(next.paymentHash);
+    if (confirmedId.current !== next.id) setPhase(current => next.status === 'payment_required' && ['payment_pending', 'payment_verifying'].includes(current) ? current : phaseFor(next));
+  }, []);
+  const cache = (key: string | null, values: SavedChallenge) => {
+    if (!key) return;
+    try { localStorage.setItem(key, JSON.stringify(values)); } catch { /* Memory state still protects an in-flight payment. */ }
+  };
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   useEffect(() => {
     const version = ++operation.current;
-    busy.current = false; pendingActionRef.current = null; settlementRef.current = null;
-    setSession(null); setTxHash(null); setClaimHash(null); setError(null); setPhase('idle');
-    setPendingAction(null); setClaiming(false); setRewardRoundIds([]); setRewardRound(null);
+    busy.current = false; confirmedId.current = null;
+    setSession(null); setPaymentHash(null); setRoundHash(null); setActualReward('0'); setConfirmedSuccess(false); setError(null); setPhase('idle');
     if (storageKey) {
       try {
         const raw = localStorage.getItem(storageKey);
-        if (raw) {
-          const saved = JSON.parse(raw) as { session?: ChallengeSession; txHash?: string; claimHash?: string; rewardRoundIds?: string[]; pendingAction?: PendingAction };
-          const restored = saved.session && saved.session.player.toLowerCase() === address?.toLowerCase() ? saved.session : null;
-          const hash = validHash(saved.txHash) ? saved.txHash : null;
-          setSession(restored); setTxHash(hash); settlementRef.current = hash;
-          setClaimHash(validHash(saved.claimHash) ? saved.claimHash : null);
-          setRewardRoundIds((saved.rewardRoundIds || []).filter(id => /^\d+$/.test(id)));
-          if (saved.pendingAction && validHash(saved.pendingAction.hash) && ['claim', 'round'].includes(saved.pendingAction.kind)) {
-            pendingActionRef.current = saved.pendingAction; setPendingAction(saved.pendingAction); setClaiming(true);
-          }
-          // Cached confirmations are checked against actual receipts again after reload.
-          setPhase(hash ? 'submitting' : restored?.attestation ? 'resolved' : restored ? 'active' : 'idle');
-          if (restored && !hash) {
-            void api<ChallengeSession>(`/api/game/challenges/${restored.id}`, { headers: { 'x-challenge-token': restored.token } }).then(next => {
-              if (scope.current !== storageKey || operation.current !== version) return;
-              setSession(next); setPhase(next.attestation ? 'resolved' : 'active');
-            }).catch(cause => {
-              if (scope.current !== storageKey || operation.current !== version) return;
-              if (/not found|invalid challenge session/i.test(String(cause))) { setSession(null); setPhase('idle'); }
-              setError(explain(cause));
-            });
-          }
+        const saved = raw ? JSON.parse(raw) as SavedChallenge : null;
+        const restored = saved?.session && saved.session.player.toLowerCase() === address?.toLowerCase() ? saved.session : null;
+        if (restored) {
+          const hash = validHash(saved?.paymentHash) ? saved.paymentHash : validHash(restored.paymentHash) ? restored.paymentHash : null;
+          setSession(restored); setPaymentHash(hash); setPhase(hash && restored.status === 'payment_required' ? 'payment_pending' : phaseFor(restored));
+          void api<ChallengeSession>(`/api/game/challenges/${restored.id}`, { headers: { 'x-challenge-token': restored.token } }).then(next => {
+            if (scope.current === storageKey && operation.current === version) applySession(next);
+          }).catch(cause => {
+            if (scope.current !== storageKey || operation.current !== version) return;
+            // A paid or pending challenge is retained across a transient server/RPC outage.
+            setError(explain(cause));
+            if (!hash && /not found|invalid challenge session/i.test(String(cause))) { setSession(null); setPhase('idle'); }
+          });
         }
-      } catch { /* An unavailable local cache never blocks play. */ }
+        if (validHash(saved?.roundHash)) setRoundHash(saved.roundHash);
+      } catch { /* An unavailable local cache never blocks wallet connection. */ }
     }
     setHydratedKey(storageKey);
-  }, [storageKey, address]);
+  }, [storageKey, address, applySession]);
   useEffect(() => {
-    // A key in React state prevents the loading commit from saving the previous context.
     if (!storageKey || hydratedKey !== storageKey || (session && session.player.toLowerCase() !== address?.toLowerCase())) return;
-    try { localStorage.setItem(storageKey, JSON.stringify({ session, txHash, phase, claimHash, rewardRoundIds, pendingAction })); }
-    catch { /* Browsers may disable localStorage. */ }
-  }, [storageKey, hydratedKey, session, txHash, phase, claimHash, rewardRoundIds, pendingAction, address]);
+    cache(storageKey, { session: session || undefined, paymentHash: paymentHash || undefined, roundHash: roundHash || undefined });
+  }, [storageKey, hydratedKey, session, paymentHash, roundHash, address]);
+
+  // The receipt binds this payment to the exact wallet, challenge, and public round.
+  useEffect(() => {
+    if (!session || session.paidAt || !paymentHash || !client || !state?.contractAddress || hydratedKey !== storageKey) return;
+    let cancelled = false, checking = false;
+    const current = session, key = storageKey;
+    const check = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const receipt = await client.getTransactionReceipt({ hash: paymentHash });
+        if (cancelled || scope.current !== key) return;
+        const entered = findEvent(receipt, state.contractAddress!, 'ChallengeEntered', args =>
+          String(args.challengeId).toLowerCase() === current.id.toLowerCase() && String(args.player).toLowerCase() === current.player.toLowerCase() && String(args.roundId) === current.roundId && String(args.fee) === current.fee);
+        if (receipt.status === 'reverted' || !entered) {
+          setPaymentHash(null); setPhase('payment_failed');
+          setError(receipt.status === 'reverted' ? '付款交易已回滚，合约没有收取挑战费，可以重试。' : '这笔交易没有支付当前挑战，请检查钱包交易。');
+          return;
+        }
+        setPhase('payment_verifying');
+        const next = await api<ChallengeSession>(`/api/challenges/${current.id}/payment`, { method: 'POST', body: JSON.stringify({ token: current.token, hash: paymentHash }) });
+        if (cancelled || scope.current !== key) return;
+        applySession(next); setError(null); void reportTransaction(paymentHash, current.id); void refresh();
+      } catch (cause) {
+        // A missing receipt remains pending. Backend verification errors retry without another payment.
+        if (!cancelled && scope.current === key && !/receipt.*not found|could not be found/i.test(String(cause))) setError(explain(cause));
+      } finally { checking = false; }
+    };
+    void check(); const timer = setInterval(() => void check(), 2500);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [session?.id, session?.paidAt, session?.fee, paymentHash, client, state?.contractAddress, storageKey, hydratedKey, applySession, reportTransaction, refresh]);
+
+  // Results and relay hashes survive page reloads; the player never signs a settlement transaction.
+  useEffect(() => {
+    if (!session || !session.paidAt || phase === 'confirmed' || hydratedKey !== storageKey) return;
+    let cancelled = false, checking = false;
+    const id = session.id, token = session.token, key = storageKey;
+    const check = async () => {
+      if (checking || busy.current || confirmedId.current === id) return;
+      checking = true;
+      const version = operation.current;
+      try {
+        const next = await api<ChallengeSession>(`/api/game/challenges/${id}`, { headers: { 'x-challenge-token': token } });
+        if (!cancelled && scope.current === key && operation.current === version && !busy.current && activeSession.current?.id === id) applySession(next);
+      } catch { /* Private polling reconnects without disturbing the current conversation. */ }
+      finally { checking = false; }
+    };
+    const timer = setInterval(() => void check(), 2500);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [session?.id, session?.paidAt, phase === 'confirmed', storageKey, hydratedKey, applySession]);
 
   useEffect(() => {
-    if (!txHash || phase !== 'submitting' || !client || !session || !state?.contractAddress || hydratedKey !== storageKey) return;
+    const hash = session?.settlementHash;
+    if (!session || !validHash(hash) || !client || !state?.contractAddress || hydratedKey !== storageKey || confirmedId.current === session.id) return;
+    let cancelled = false, checking = false;
+    const current = session, key = storageKey;
+    const matches = (args: Record<string, unknown>) => String(args.challengeId).toLowerCase() === current.id.toLowerCase() && String(args.player).toLowerCase() === current.player.toLowerCase() && String(args.roundId) === current.roundId;
+    const check = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const receipt = await client.getTransactionReceipt({ hash });
+        if (cancelled || scope.current !== key) return;
+        const settled = findEvent(receipt, state.contractAddress!, 'ChallengeSettled', matches);
+        if (receipt.status !== 'success' || !settled) {
+          setPhase('settlement_failed'); setError('结算交易未成功，可以重试后台结算；不会再次收取挑战费。'); return;
+        }
+        const reward = String(settled.reward || '0');
+        const paid = findEvent(receipt, state.contractAddress!, 'RewardPaid', args => matches(args) && String(args.amount) === reward);
+        if (settled.success && BigInt(reward) > 0n && !paid) {
+          setPhase('settlement_failed'); setError('尚未找到向本次付款钱包发奖的记录，请重试查询。'); return;
+        }
+        confirmedId.current = current.id; setActualReward(reward); setConfirmedSuccess(Boolean(settled.success)); setPhase('confirmed'); setError(null);
+        void reportTransaction(hash, current.id); void refresh();
+      } catch { /* The relay remains pending until a genuine receipt is available. */ }
+      finally { checking = false; }
+    };
+    void check(); const timer = setInterval(() => void check(), 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [session?.id, session?.settlementHash, client, state?.contractAddress, storageKey, hydratedKey, refresh, reportTransaction]);
+
+  useEffect(() => {
+    if (!roundHash || !client || !state?.contractAddress || hydratedKey !== storageKey) return;
     let cancelled = false, checking = false;
     const check = async () => {
       if (checking) return;
       checking = true;
       try {
-        const receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
+        const receipt = await client.getTransactionReceipt({ hash: roundHash });
         if (cancelled) return;
-        const settled = findEvent(receipt, state.contractAddress!, 'ChallengeSettled', args =>
-          String(args.challengeId).toLowerCase() === session.id.toLowerCase() && String(args.player).toLowerCase() === session.player.toLowerCase() && String(args.roundId) === session.roundId);
-        if (receipt.status === 'success' && settled) {
-          setPhase('confirmed'); setError(null);
-          if (settled.success) setRewardRoundIds(ids => ids.includes(session.roundId) ? ids : [...ids, session.roundId]);
-          void reportTransaction(txHash, session.id); void refresh();
-        } else {
-          setPhase('failed'); setError(receipt.status === 'reverted' ? '交易已回滚，挑战费未被合约收取。检查公共回合后可重试。' : '这笔交易没有记录当前挑战，请重新结算。');
-          settlementRef.current = null; setTxHash(null);
-        }
-      } catch { /* Missing receipts and RPC errors keep the original transaction pending. */ }
+        const event = findEvent(receipt, state.contractAddress!, 'GameRoundStarted', () => true);
+        if (receipt.status !== 'success' || !event) setError('新回合交易未成功，可以重试。');
+        else { setError(null); void reportTransaction(roundHash); void refresh(); }
+        setRoundHash(null);
+      } catch { /* Keep the submitted round transaction pending. */ }
       finally { checking = false; }
     };
-    void check(); const interval = setInterval(() => void check(), 2000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [txHash, phase, client, session, state?.contractAddress, hydratedKey, storageKey, refresh, reportTransaction]);
+    void check(); const timer = setInterval(() => void check(), 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [roundHash, client, state?.contractAddress, storageKey, hydratedKey, reportTransaction, refresh]);
 
-  useEffect(() => {
-    if (!pendingAction || !client || !state?.contractAddress || hydratedKey !== storageKey) return;
-    let cancelled = false, checking = false;
-    const action = pendingAction;
-    const check = async () => {
-      if (checking) return;
-      checking = true;
-      try {
-        const receipt = await client.getTransactionReceipt({ hash: action.hash });
-        if (cancelled) return;
-        const event = findEvent(receipt, state.contractAddress!, action.kind === 'claim' ? 'RewardClaimed' : 'GameRoundStarted', args =>
-          action.kind === 'round' || (String(args.roundId) === action.roundId && String(args.player).toLowerCase() === address?.toLowerCase()));
-        if (receipt.status !== 'success' || !event) setError('交易已回滚或没有执行该操作，可以重新尝试。');
-        else {
-          setError(null);
-          if (action.kind === 'claim') setRewardRoundIds(ids => ids.filter(id => id !== action.roundId));
-          void reportTransaction(action.hash); void refresh();
-        }
-        pendingActionRef.current = null; setPendingAction(null); setClaiming(false);
-      } catch { /* A receipt timeout is not a failed or cancelled transaction. */ }
-      finally { checking = false; }
-    };
-    void check(); const interval = setInterval(() => void check(), 2000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [pendingAction, client, state?.contractAddress, hydratedKey, storageKey, address, reportTransaction, refresh]);
-
-  useEffect(() => {
-    if (!client || !state?.contractAddress || !address || hydratedKey !== storageKey) return;
-    let cancelled = false;
-    void Promise.all(rewardRoundIds.map(async id => {
-      try { return { id, round: await client.readContract({ address: state.contractAddress as Address, abi, functionName: 'getRound', args: [BigInt(id)] }) as ChainRound }; }
-      catch { return { id, round: null }; }
-    })).then(records => {
-      if (cancelled) return;
-      const unclaimed = records.filter(({ round }) => !round || (!round.rewardClaimed && round.reward > 0n && round.winner.toLowerCase() === address.toLowerCase()));
-      if (unclaimed.length !== rewardRoundIds.length) setRewardRoundIds(unclaimed.map(item => item.id));
-      const first = unclaimed.find(item => item.round)?.round;
-      setRewardRound(first ? publicRound(first) : null);
-    });
-    return () => { cancelled = true; };
-  }, [rewardRoundIds, client, state?.contractAddress, state?.round.id, state?.round.rewardClaimed, state?.metrics.confirmedTransactions, address, hydratedKey, storageKey]);
-
-  const checkReady = (snapshot = state) => {
-    if (!address) throw new Error('先连接你的 Monad Testnet 钱包。');
+  const checkReady = (snapshot: GameSnapshot | null = state) => {
+    if (!address) throw new Error('先连接你自己的 Monad Testnet 钱包。');
     if (chainId !== monad.id) throw new Error('请先将钱包切换到 Monad Testnet。');
-    if (!snapshot?.configured || !snapshot.contractAddress) throw new Error('竞技场正在等待合约部署，请稍后再来。');
+    if (!snapshot?.configured || !snapshot.contractAddress) throw new Error('竞技场合约连接暂不可用。');
     if (snapshot.chainId !== monad.id) throw new Error('当前服务未连接 Monad Testnet。');
     return snapshot;
   };
@@ -182,117 +217,78 @@ export function useChallenge() {
     return { key, current: () => scope.current === key && operation.current === version,
       end: () => { if (scope.current === key && operation.current === version) busy.current = false; } };
   };
-  const storePending = (key: string | null, values: Record<string, unknown>) => {
-    if (!key) return;
-    try {
-      const saved = JSON.parse(localStorage.getItem(key) || '{}');
-      localStorage.setItem(key, JSON.stringify({ ...saved, session, rewardRoundIds, ...values }));
-    } catch { /* Pending state is also kept in memory. */ }
+  const blocked = () => busy.current || !!roundHash || (!!paymentHash && !session?.paidAt) || ['payment_pending', 'payment_verifying', 'settling'].includes(phase);
+  const pay = async (current: ChallengeSession, snapshot: GameSnapshot, task: ReturnType<typeof begin>) => {
+    if (!client) throw new Error('测试网 RPC 暂不可用，请稍后再试。');
+    if (current.player.toLowerCase() !== address?.toLowerCase()) throw new Error('请切回本场挑战的钱包。');
+    const round = await client.readContract({ address: snapshot.contractAddress as Address, abi, functionName: 'getCurrentRound' }) as ChainRound;
+    if (!task.current()) return;
+    if (!round.active || Number(round.endsAt) * 1000 <= Date.now() || String(round.id) !== current.roundId) throw new Error('公共回合已结束，请开启新回合后再支付。');
+    if (round.challengeFee.toString() !== current.fee) throw new Error('挑战费用已更新，请重新开启本场。');
+    setPhase('signing');
+    const hash = await writeContractAsync({ account: current.player as Address, address: snapshot.contractAddress as Address, abi, functionName: 'enterChallenge', args: [current.id as Hash, BigInt(current.roundId)], value: round.challengeFee, chainId: monad.id });
+    // Write before React renders so reloading cannot offer a second payment.
+    cache(task.key, { session: current, paymentHash: hash }); void reportTransaction(hash, current.id);
+    if (!task.current()) return;
+    setPaymentHash(hash); setPhase('payment_pending');
   };
-  const blocked = () => busy.current || !!pendingActionRef.current || (!!settlementRef.current && phase !== 'confirmed');
   const start = async () => {
-    if (blocked()) return;
+    if (blocked() || (session && session.status !== 'payment_required')) return;
     const task = begin(); setError(null); setPhase('starting');
     try {
-      const snapshot = await refresh(); if (!task.current()) return;
-      checkReady(snapshot);
-      const next = await api<ChallengeSession>('/api/challenges/start', { method: 'POST', body: JSON.stringify({ player: address }) });
+      const snapshot = checkReady(await refresh()); if (!task.current()) return;
+      const next = session || await api<ChallengeSession>('/api/challenges/start', { method: 'POST', body: JSON.stringify({ player: address }) });
       if (!task.current()) return;
-      setSession(next); setTxHash(null); settlementRef.current = null; setPhase(next.attestation ? 'resolved' : 'active');
-    } catch (cause) { if (task.current()) { setError(explain(cause)); setPhase(phase); } }
+      setSession(next); cache(task.key, { session: next });
+      await pay(next, snapshot, task);
+    } catch (cause) { if (task.current()) { setError(explain(cause)); setPhase(activeSession.current ? 'payment_required' : 'idle'); } }
     finally { task.end(); }
   };
   const finishSession = (current: ChallengeSession) => api<ChallengeSession>(`/api/challenges/${current.id}/finish`, { method: 'POST', body: JSON.stringify({ token: current.token }) });
   const send = async (message: string) => {
-    if (!session || blocked() || phase !== 'active' || !message.trim()) return;
+    if (!session?.paidAt || blocked() || phase !== 'active' || !message.trim()) return false;
     const task = begin(); setError(null); setPhase('thinking');
     try {
       let next = await api<ChallengeSession>(`/api/challenges/${session.id}/message`, { method: 'POST', body: JSON.stringify({ token: session.token, message: message.trim() }) });
-      if (!next.attestation && (next.result?.result || next.messages.filter(item => item.role === 'user').length >= next.maxMessages)) next = await finishSession(next);
-      if (!task.current()) return;
-      setSession(next); setPhase(next.attestation ? 'resolved' : 'active');
-    } catch (cause) { if (task.current()) { setError(explain(cause)); setPhase(session.attestation ? 'resolved' : 'active'); } }
+      if (next.status === 'active' && (next.result?.result || next.messages.filter(item => item.role === 'user').length >= next.maxMessages)) next = await finishSession(next);
+      if (task.current()) { applySession(next); return true; }
+      return false;
+    } catch (cause) { if (task.current()) { setError(explain(cause)); setPhase(phaseFor(session)); } return false; }
     finally { task.end(); }
   };
   const finish = async () => {
-    if (!session || blocked() || txHash) return;
-    const task = begin(); setError(null); setPhase('thinking');
-    try { const next = await finishSession(session); if (task.current()) { setSession(next); setPhase('resolved'); } }
-    catch (cause) { if (task.current()) { setError(explain(cause)); setPhase(session.attestation ? 'resolved' : 'active'); } }
+    if (!session?.paidAt || blocked() || phase === 'confirmed') return;
+    const task = begin(); setError(null); setPhase(session.result ? 'settling' : 'thinking');
+    try { const next = await finishSession(session); if (task.current()) applySession(next); }
+    catch (cause) { if (task.current()) { setError(explain(cause)); setPhase(session.result ? 'settlement_failed' : 'active'); } }
     finally { task.end(); }
   };
-  const settle = async () => {
-    if (!session?.attestation || blocked() || txHash || !client) return;
+  const nextRound = async () => {
+    if (blocked() || !client) return;
     const task = begin(); setError(null);
     try {
       const snapshot = checkReady(await refresh()); if (!task.current()) return;
       const round = await client.readContract({ address: snapshot.contractAddress as Address, abi, functionName: 'getCurrentRound' }) as ChainRound;
       if (!task.current()) return;
-      if (!round.active || String(round.id) !== session.roundId) throw new Error('这一公共回合已经结束，本轮未扣挑战费。可以加入下一回合。');
-      let attestation: Attestation = session.attestation;
-      let latestSession = session;
-      if (Number(attestation.result.deadline) <= Date.now() / 1000 + 10) {
-        latestSession = await finishSession(session);
-        if (!task.current()) return;
-        if (!latestSession.attestation) throw new Error('本轮结果尚未就绪。');
-        attestation = latestSession.attestation; setSession(latestSession);
-      }
-      const r = attestation.result;
-      if (r.player.toLowerCase() !== address?.toLowerCase()) throw new Error('请切回本轮挑战使用的钱包。');
-      setPhase('signing');
-      const hash = await writeContractAsync({ address: snapshot.contractAddress as Address, abi, functionName: 'settleChallenge', args: [{ ...r, roundId: BigInt(r.roundId), score: BigInt(r.score), deadline: BigInt(r.deadline) }, attestation.signature], value: round.challengeFee, chainId: monad.id });
-      storePending(task.key, { session: latestSession, txHash: hash, phase: 'submitting' });
-      void reportTransaction(hash, session.id);
-      if (!task.current()) return;
-      settlementRef.current = hash; setTxHash(hash); setPhase('submitting');
-    } catch (cause) { if (task.current()) { setError(explain(cause)); setPhase('failed'); } }
+      if (round.active && Number(round.endsAt) * 1000 > Date.now()) { await refresh(); return; }
+      const hash = await writeContractAsync({ address: snapshot.contractAddress as Address, abi, functionName: 'startGameRound', chainId: monad.id });
+      cache(task.key, { session: session || undefined, paymentHash: paymentHash || undefined, roundHash: hash }); void reportTransaction(hash);
+      if (task.current()) setRoundHash(hash);
+    } catch (cause) { if (task.current()) setError(explain(cause)); }
     finally { task.end(); }
   };
-  const claim = async () => {
-    if (blocked() || !client || !rewardRound) return;
-    const task = begin(); setClaiming(true); setError(null);
-    try {
-      const snapshot = checkReady(await refresh()); if (!task.current()) return;
-      const round = await client.readContract({ address: snapshot.contractAddress as Address, abi, functionName: 'getRound', args: [BigInt(rewardRound.id)] }) as ChainRound;
-      if (!task.current()) return;
-      if (round.rewardClaimed || round.reward === 0n || round.winner.toLowerCase() !== address?.toLowerCase()) throw new Error('这一回合没有待领取奖励，请刷新查看状态。');
-      const hash = await writeContractAsync({ address: snapshot.contractAddress as Address, abi, functionName: 'claimReward', args: [round.id], chainId: monad.id });
-      const action: PendingAction = { kind: 'claim', hash, roundId: String(round.id) };
-      storePending(task.key, { claimHash: hash, pendingAction: action }); void reportTransaction(hash);
-      if (!task.current()) return;
-      pendingActionRef.current = action; setPendingAction(action); setClaimHash(hash);
-    } catch (cause) { if (task.current()) setError(explain(cause)); }
-    finally { if (task.current() && !pendingActionRef.current) setClaiming(false); task.end(); }
+  const reset = () => {
+    if (busy.current || roundHash || (session && session.paidAt && phase !== 'confirmed') || paymentHash && !['confirmed', 'payment_failed'].includes(phase)) return;
+    operation.current += 1; confirmedId.current = null;
+    setSession(null); setPaymentHash(null); setPhase('idle'); setError(null); setActualReward('0'); setConfirmedSuccess(false);
   };
-  const nextRound = async () => {
-    if (blocked() || !client) return;
-    const task = begin(); setClaiming(true); setError(null);
-    try {
-      const snapshot = checkReady(await refresh()); if (!task.current()) return;
-      const round = await client.readContract({ address: snapshot.contractAddress as Address, abi, functionName: 'getCurrentRound' }) as ChainRound;
-      if (!task.current()) return;
-      if (round.active) { await refresh(); return; }
-      const hash = await writeContractAsync({ address: snapshot.contractAddress as Address, abi, functionName: 'startGameRound', chainId: monad.id });
-      const action: PendingAction = { kind: 'round', hash };
-      storePending(task.key, { pendingAction: action }); void reportTransaction(hash);
-      if (!task.current()) return;
-      pendingActionRef.current = action; setPendingAction(action);
-    } catch (cause) { if (task.current()) setError(explain(cause)); }
-    finally { if (task.current() && !pendingActionRef.current) setClaiming(false); task.end(); }
-  };
-  const reset = useCallback(() => {
-    if (busy.current || pendingActionRef.current || (settlementRef.current && phase !== 'confirmed')) return;
-    operation.current += 1; settlementRef.current = null;
-    setSession(null); setTxHash(null); setPhase('idle'); setError(null);
-    // Unclaimed rewards and their transaction state survive starting the next challenge.
-  }, [phase]);
   const visible = hydratedKey === storageKey;
   const used = session?.messages.filter(item => item.role === 'user').length || 0;
   return { session: visible ? session : null, messages: visible ? session?.messages || [] : [], phase: visible ? phase : 'idle', error: visible ? error : null,
-    txHash: visible ? txHash : null, claimHash: visible ? claimHash : null, claiming: claiming || !!pendingAction,
-    rewardRound: visible ? rewardRound : null, canClaim: visible && !!rewardRound && !rewardRound.rewardClaimed,
-    pendingActionHash: visible ? pendingAction?.hash || null : null,
+    paymentHash: visible ? paymentHash : null, txHash: visible ? session?.settlementHash || null : null,
+    actualReward: visible ? actualReward : '0', confirmedSuccess: visible && confirmedSuccess,
+    pendingActionHash: visible ? roundHash : null, roundPending: !!roundHash,
     remaining: Math.max(0, (session?.maxMessages || GAME_RULES.maxMessages) - used),
-    secondsLeft: session ? Math.max(0, Math.ceil((session.expiresAt * (session.expiresAt < 1e12 ? 1000 : 1) - now) / 1000)) : GAME_RULES.challengeDurationSeconds,
-    result: visible ? session?.result : undefined, start, send, finish, settle, claim, nextRound, reset };
+    secondsLeft: session?.paidAt ? Math.max(0, Math.ceil((session.expiresAt * (session.expiresAt < 1e12 ? 1000 : 1) - now) / 1000)) : GAME_RULES.challengeDurationSeconds,
+    result: visible ? session?.result : undefined, start, send, finish, nextRound, reset };
 }

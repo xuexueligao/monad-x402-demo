@@ -1,0 +1,71 @@
+{
+  "formatVersion": 1,
+  "status": "complete",
+  "network": "Monad Testnet",
+  "chainId": 10143,
+  "contractAddress": "0xc998eb98453f4c26Aba98D369E8C3895b8061085",
+  "createdAt": "2026-10-17T07:41:09.305Z",
+  "aiMode": "local-rules",
+  "agentRuntime": "pi-agent-core",
+  "note": "One real failed challenge settlement. Pi local-rules mode is not a live external model.",
+  "player": "0xb49a5CbB09A8875cd789DDDFfC32fbAE3442Fe48",
+  "challengeId": "0x997bce05290571a42a1a6bc2d2dca4325530bdb6d23d0de7a0da61175ae1f795",
+  "roundId": "1",
+  "result": {
+    "success": false,
+    "score": "10"
+  },
+  "challengeFeeWei": "10000000000000000000",
+  "estimatedGas": "339265",
+  "estimatedGasCostMON": "0.03460503",
+  "backendSignatureVerified": true,
+  "chatDidNotSubmitTransactions": true,
+  "transactionHash": "0xeb48d85850521dc9e9a945e71e25605a7737f8d77b038a62f066d8e4e930ce7b",
+  "transactionUrl": "https://testnet.monadscan.com/tx/0xeb48d85850521dc9e9a945e71e25605a7737f8d77b038a62f066d8e4e930ce7b",
+  "receiptStatus": "success",
+  "blockNumber": "71764191",
+  "gasUsed": "339265",
+  "effectiveGasPriceWei": "102000000000",
+  "gasCostMON": "0.03460503",
+  "verifiedAt": "2026-10-17T07:41:15.958Z",
+  "poolAfterWei": "8000000000000000000",
+  "contractBalanceAfterWei": "10000000000000000000",
+  "totalChallenges": 1,
+  "playerStats": {
+    "attempts": "1",
+    "successes": "0",
+    "score": "10",
+    "wins": "0"
+  },
+  "backendTracked": true,
+  "duplicateSettlementRejected": "ChallengeAlreadySettled",
+  "socketClientsVerified": 2,
+  "sharedChainConfirmed": true,
+  "piToolsExecuted": [
+    "get_game_state",
+    "get_player_stats",
+    "get_recent_events",
+    "inspect_vault",
+    "judge_challenge"
+  ],
+  "leaderboard": [
+    {
+      "address": "0xb49a5CbB09A8875cd789DDDFfC32fbAE3442Fe48",
+      "attempts": 1,
+      "successes": 0,
+      "score": 10,
+      "wins": 0
+    }
+  ],
+  "checks": [
+    "backend signature verified",
+    "ordinary chat produced no chain settlement",
+    "exactly ten MON fee paid",
+    "real receipt and ChallengeSettled event confirmed",
+    "eight MON public pool recorded",
+    "ten points recorded on-chain",
+    "duplicate challenge simulation reverted",
+    "both socket observers received actual chain confirmation",
+    "transaction API matches actual receipt"
+  ]
+}

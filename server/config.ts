@@ -15,6 +15,7 @@ export interface ServerConfig {
   aiApiKey?: string;
   aiBaseUrl: string;
   aiModel: string;
+  sessionStorePath?: string;
 }
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -44,5 +45,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     aiApiKey: env.AI_API_KEY || env.OPENAI_API_KEY,
     aiBaseUrl: (env.AI_BASE_URL || env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, ''),
     aiModel: env.AI_MODEL || env.OPENAI_MODEL || 'gpt-4o-mini',
+    // Test fixtures pass an explicit environment and stay entirely in memory.
+    sessionStorePath: env.ARENA_SESSION_STORE_PATH || (env === process.env ? '.local/arena-sessions.json' : undefined),
   };
 }

@@ -5,7 +5,7 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/// @notice Multiplayer testnet game. The server judges dialogue; players pay and settle on chain.
+/// @notice Players prepay a challenge. A signed server verdict settles it and pays the payer.
 contract RugArena is EIP712, ReentrancyGuard {
     struct ChallengeResult {
         bytes32 challengeId;
@@ -45,6 +45,8 @@ contract RugArena is EIP712, ReentrancyGuard {
         bytes32 transcriptHash;
         uint256 settledAt;
         bool settled;
+        uint256 enteredAt;
+        uint256 expiresAt;
     }
 
     bytes32 public constant RESULT_TYPEHASH = keccak256(
@@ -58,9 +60,9 @@ contract RugArena is EIP712, ReentrancyGuard {
     uint256 public immutable poolShareBps;
     uint256 public immutable rewardBps;
     uint256 public immutable roundDuration;
+    uint256 public immutable challengeDuration;
     uint256 public currentRoundId;
     uint256 public prizePool;
-    uint256 public reservedRewards;
     uint256 public totalChallenges;
 
     mapping(uint256 => GameRound) private _rounds;
@@ -68,10 +70,11 @@ contract RugArena is EIP712, ReentrancyGuard {
     mapping(bytes32 => ChallengeRecord) private _challenges;
     address[] private _playerAddresses;
 
+    event ChallengeEntered(bytes32 indexed challengeId, address indexed player, uint256 indexed roundId, uint256 fee, uint256 expiresAt);
     event ChallengeSettled(bytes32 indexed challengeId, address indexed player, uint256 indexed roundId, bool success, uint256 score, uint256 fee, uint256 reward);
     event PrizePoolUpdated(uint256 indexed roundId, uint256 prizePool);
     event WinnerDeclared(uint256 indexed roundId, address indexed player, bytes32 challengeId, uint256 reward);
-    event RewardClaimed(uint256 indexed roundId, address indexed player, uint256 amount);
+    event RewardPaid(uint256 indexed roundId, address indexed player, bytes32 indexed challengeId, uint256 amount);
     event GameRoundStarted(uint256 indexed roundId, uint256 endsAt, uint256 prizePool);
 
     error InvalidConfiguration();
@@ -81,19 +84,19 @@ contract RugArena is EIP712, ReentrancyGuard {
     error RoundClosed();
     error RoundStillActive();
     error ChallengeAlreadySettled();
+    error ChallengeAlreadyEntered();
+    error ChallengeNotEntered();
     error ResultExpired();
     error InvalidSignature();
     error IncorrectFee();
     error InvalidScore();
-    error NoReward();
-    error RewardAlreadyClaimed();
     error InsufficientAvailableBalance();
     error NativeTransferFailed();
 
-    constructor(address resultSigner_, uint256 challengeFee_, uint256 poolShareBps_, uint256 rewardBps_, uint256 roundDuration_)
+    constructor(address resultSigner_, uint256 challengeFee_, uint256 poolShareBps_, uint256 rewardBps_, uint256 roundDuration_, uint256 challengeDuration_)
         payable EIP712("Monad Rug Arena", "1")
     {
-        if (resultSigner_ == address(0) || challengeFee_ == 0 || poolShareBps_ > 10_000 || rewardBps_ == 0 || rewardBps_ > 10_000 || roundDuration_ == 0) {
+        if (resultSigner_ == address(0) || challengeFee_ == 0 || poolShareBps_ > 10_000 || rewardBps_ == 0 || rewardBps_ > 10_000 || roundDuration_ == 0 || challengeDuration_ == 0) {
             revert InvalidConfiguration();
         }
         resultSigner = resultSigner_;
@@ -101,6 +104,7 @@ contract RugArena is EIP712, ReentrancyGuard {
         poolShareBps = poolShareBps_;
         rewardBps = rewardBps_;
         roundDuration = roundDuration_;
+        challengeDuration = challengeDuration_;
         prizePool = msg.value;
         _startRound();
     }
@@ -112,7 +116,7 @@ contract RugArena is EIP712, ReentrancyGuard {
         emit PrizePoolUpdated(currentRoundId, prizePool);
     }
 
-    /// @notice Anyone can reopen the arena once a winner is declared or the round expires.
+    /// @notice Anyone can start the next admission epoch once this public round expires.
     function startGameRound() external {
         GameRound storage previous = _rounds[currentRoundId];
         if (previous.active && block.timestamp < previous.endsAt) revert RoundStillActive();
@@ -120,60 +124,77 @@ contract RugArena is EIP712, ReentrancyGuard {
         _startRound();
     }
 
-    function settleChallenge(ChallengeResult calldata result, bytes calldata signature) external payable {
-        if (result.challengeId == bytes32(0) || result.transcriptHash == bytes32(0)) revert InvalidChallenge();
-        if (_challenges[result.challengeId].settled) revert ChallengeAlreadySettled();
-        if (msg.sender != result.player) revert WrongPlayer();
-        if (result.roundId != currentRoundId) revert WrongRound();
-        GameRound storage round = _rounds[currentRoundId];
+    /// @notice Payment opens one three-message session; its fee is never charged again.
+    function enterChallenge(bytes32 challengeId, uint256 roundId) external payable {
+        if (challengeId == bytes32(0)) revert InvalidChallenge();
+        if (_challenges[challengeId].player != address(0)) revert ChallengeAlreadyEntered();
+        if (roundId != currentRoundId) revert WrongRound();
+        GameRound storage round = _rounds[roundId];
         if (!round.active || block.timestamp >= round.endsAt) revert RoundClosed();
-        if (block.timestamp > result.deadline) revert ResultExpired();
         if (msg.value != challengeFee) revert IncorrectFee();
-        if (result.score != (result.success ? SUCCESS_SCORE : FAILURE_SCORE)) revert InvalidScore();
-        (address recovered, ECDSA.RecoverError recoveryError,) = ECDSA.tryRecover(hashResult(result), signature);
-        if (recoveryError != ECDSA.RecoverError.NoError || recovered != resultSigner) revert InvalidSignature();
+
+        ChallengeRecord storage challenge = _challenges[challengeId];
+        challenge.player = msg.sender;
+        challenge.roundId = roundId;
+        challenge.fee = msg.value;
+        challenge.enteredAt = block.timestamp;
+        challenge.expiresAt = block.timestamp + challengeDuration;
 
         PlayerStats storage stats = _players[msg.sender];
         if (stats.attempts == 0) _playerAddresses.push(msg.sender);
         stats.attempts += 1;
-        stats.score += result.score;
         totalChallenges += 1;
         prizePool += msg.value * poolShareBps / 10_000;
+        round.prizePool = prizePool;
+        emit ChallengeEntered(challengeId, msg.sender, roundId, msg.value, challenge.expiresAt);
+        emit PrizePoolUpdated(roundId, prizePool);
+    }
+
+    /// @notice The backend pays the gas. Only the prepaid player can receive a reward.
+    /// @dev A paid session remains settleable after the public admission round changes.
+    function settleChallenge(ChallengeResult calldata result, bytes calldata signature) external nonReentrant {
+        if (result.challengeId == bytes32(0) || result.transcriptHash == bytes32(0)) revert InvalidChallenge();
+        ChallengeRecord storage challenge = _challenges[result.challengeId];
+        if (challenge.player == address(0)) revert ChallengeNotEntered();
+        if (challenge.settled) revert ChallengeAlreadySettled();
+        if (result.player != challenge.player) revert WrongPlayer();
+        if (result.roundId != challenge.roundId) revert WrongRound();
+        GameRound storage round = _rounds[challenge.roundId];
+        if (block.timestamp > result.deadline) revert ResultExpired();
+        if (result.score != (result.success ? SUCCESS_SCORE : FAILURE_SCORE)) revert InvalidScore();
+        (address recovered, ECDSA.RecoverError recoveryError,) = ECDSA.tryRecover(hashResult(result), signature);
+        if (recoveryError != ECDSA.RecoverError.NoError || recovered != resultSigner) revert InvalidSignature();
+
+        PlayerStats storage stats = _players[challenge.player];
+        stats.score += result.score;
 
         uint256 reward;
         if (result.success) {
             stats.successes += 1;
             stats.wins += 1;
-            round.active = false;
-            round.winner = msg.sender;
+            round.winner = challenge.player;
             reward = prizePool * rewardBps / 10_000;
-            // Prior winners' unclaimed balances can never be offered to a new winner.
-            if (reward > address(this).balance - reservedRewards) revert InsufficientAvailableBalance();
+            if (reward > address(this).balance) revert InsufficientAvailableBalance();
             prizePool -= reward;
-            reservedRewards += reward;
             round.reward = reward;
+            round.rewardClaimed = true;
         }
         round.prizePool = prizePool;
-        _challenges[result.challengeId] = ChallengeRecord({
-            player: msg.sender, roundId: result.roundId, success: result.success,
-            score: result.score, fee: msg.value, reward: reward,
-            transcriptHash: result.transcriptHash, settledAt: block.timestamp, settled: true
-        });
-        emit ChallengeSettled(result.challengeId, msg.sender, result.roundId, result.success, result.score, msg.value, reward);
-        emit PrizePoolUpdated(result.roundId, prizePool);
-        if (result.success) emit WinnerDeclared(result.roundId, msg.sender, result.challengeId, reward);
-    }
-
-    /// @notice A winner may claim even after several later rounds have started.
-    function claimReward(uint256 roundId) external nonReentrant {
-        GameRound storage round = _rounds[roundId];
-        if (round.winner != msg.sender || round.reward == 0) revert NoReward();
-        if (round.rewardClaimed) revert RewardAlreadyClaimed();
-        round.rewardClaimed = true;
-        reservedRewards -= round.reward;
-        (bool sent,) = payable(msg.sender).call{value: round.reward}("");
-        if (!sent) revert NativeTransferFailed();
-        emit RewardClaimed(roundId, msg.sender, round.reward);
+        _rounds[currentRoundId].prizePool = prizePool;
+        challenge.success = result.success;
+        challenge.score = result.score;
+        challenge.reward = reward;
+        challenge.transcriptHash = result.transcriptHash;
+        challenge.settledAt = block.timestamp;
+        challenge.settled = true;
+        if (result.success) {
+            (bool sent,) = payable(challenge.player).call{value: reward}("");
+            if (!sent) revert NativeTransferFailed();
+            emit RewardPaid(result.roundId, challenge.player, result.challengeId, reward);
+            emit WinnerDeclared(result.roundId, challenge.player, result.challengeId, reward);
+        }
+        emit ChallengeSettled(result.challengeId, challenge.player, result.roundId, result.success, result.score, challenge.fee, reward);
+        emit PrizePoolUpdated(currentRoundId, prizePool);
     }
 
     function getCurrentRound() external view returns (GameRound memory round) {

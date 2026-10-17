@@ -47,6 +47,7 @@ async function main() {
   const poolShareBps = integer("ARENA_POOL_SHARE_BPS", 8000, 0n, 10000n);
   const rewardBps = integer("ARENA_REWARD_BPS", 5000, 1n, 10000n);
   const roundDuration = integer("ARENA_ROUND_DURATION_SECONDS", 7200, 1n, 31_536_000n);
+  const challengeDuration = integer("ARENA_CHALLENGE_DURATION_SECONDS", 180, 1n, 86400n);
   const seed = mon("ARENA_SEED_MON", "0", true);
   const rpcUrl = process.env.ARENA_RPC_URL || process.env.MONAD_RPC_URL || network.rpc;
   const chain = defineChain({ id: network.chainId, name: network.name,
@@ -69,14 +70,14 @@ async function main() {
     return;
   }
   const artifact = (await compile()).RugArena;
-  const constructorArgs = [resultSigner, challengeFee, poolShareBps, rewardBps, roundDuration];
+  const constructorArgs = [resultSigner, challengeFee, poolShareBps, rewardBps, roundDuration, challengeDuration];
   const manifest = {
-    formatVersion: 1, status: "prepared", chainId: 10143, network: network.name,
+    formatVersion: 2, gameFlow: "prepaid-auto-payout", status: "prepared", chainId: 10143, network: network.name,
     createdAt: new Date().toISOString(), deployer: account.address, resultSigner,
     contractName: "RugArena", sourceName: artifact.sourceName, compiler: artifact.compiler, evmVersion: artifact.evmVersion,
     explorerBaseUrl: network.explorer, constructorArgs,
-    constructorArgumentsEncoded: encodeAbiParameters([{ type: "address" }, ...Array.from({ length: 4 }, () => ({ type: "uint256" }))], constructorArgs),
-    settings: { challengeFee, poolShareBps, rewardBps, roundDuration, seed },
+    constructorArgumentsEncoded: encodeAbiParameters([{ type: "address" }, ...Array.from({ length: 5 }, () => ({ type: "uint256" }))], constructorArgs),
+    settings: { challengeFee, poolShareBps, rewardBps, roundDuration, challengeDuration, seed },
   };
   const save = () => fs.writeFile(output, json(manifest));
   await save();
@@ -92,12 +93,13 @@ async function main() {
     const address = getAddress(receipt.contractAddress);
     const code = await publicClient.getCode({ address });
     assertCompiledRuntime(code, artifact);
-    const [actualSigner, actualFee, round] = await Promise.all([
+    const [actualSigner, actualFee, actualChallengeDuration, round] = await Promise.all([
       publicClient.readContract({ address, abi: artifact.abi, functionName: "resultSigner" }),
       publicClient.readContract({ address, abi: artifact.abi, functionName: "challengeFee" }),
+      publicClient.readContract({ address, abi: artifact.abi, functionName: "challengeDuration" }),
       publicClient.readContract({ address, abi: artifact.abi, functionName: "getCurrentRound" }),
     ]);
-    if (getAddress(actualSigner) !== resultSigner || actualFee !== challengeFee || round.id !== 1n || round.prizePool !== seed) {
+    if (getAddress(actualSigner) !== resultSigner || actualFee !== challengeFee || actualChallengeDuration !== challengeDuration || round.id !== 1n || round.prizePool !== seed) {
       throw new Error("Deployed contract state differs from configured game settings.");
     }
     Object.assign(manifest, { status: "complete", address, contractAddress: address, runtimeCodeHash: keccak256(code), contractUrl: `${network.explorer}/address/${address}` });

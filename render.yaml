@@ -18,9 +18,9 @@ services:
       - key: NEXT_PUBLIC_MONAD_RPC_URL
         value: https://testnet-rpc.monad.xyz
       - key: ARENA_CONTRACT_ADDRESS
-        value: "0xc998eb98453f4c26Aba98D369E8C3895b8061085"
+        value: "0x27D86752d07FFbdd2BBDE9d2cF91Ef2B69b04552"
       - key: ARENA_DEPLOYMENT_BLOCK
-        value: "71762027"
+        value: "71772830"
       - key: ARENA_RESULT_SIGNER_PRIVATE_KEY
         sync: false
       - key: AI_API_KEY
@@ -37,3 +37,5 @@ services:
         value: "5000"
       - key: ARENA_ROUND_DURATION_SECONDS
         value: "7200"
+      - key: ARENA_CHALLENGE_DURATION_SECONDS
+        value: "180"

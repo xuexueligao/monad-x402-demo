@@ -56,6 +56,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<ArenaAp
       configured: state.configured, aiMode: state.aiMode, chainId: state.chainId,
       contractAddress: state.contractAddress, signerConfigured: !!config.signerKey,
       agentRuntime: 'pi-agent-core',
+      ...(state.relayer ? { relayer: state.relayer } : {}),
       ...(state.chainError ? { chainError: state.chainError } : {}),
     };
   };
@@ -67,6 +68,11 @@ export async function createApp(options: CreateAppOptions = {}): Promise<ArenaAp
   app.post('/api/challenges/start', async (request) => {
     const body = z.object({ player: addressSchema }).parse(request.body);
     return game.start(body.player);
+  });
+  app.post('/api/challenges/:id/payment', async (request) => {
+    const { id } = z.object({ id: hashSchema }).parse(request.params);
+    const { token, hash } = z.object({ token: tokenSchema, hash: hashSchema }).parse(request.body);
+    return game.payment(id, token, hash as Hex);
   });
   app.post('/api/challenges/:id/message', async (request) => {
     const { id } = z.object({ id: hashSchema }).parse(request.params);
@@ -128,11 +134,12 @@ export async function createApp(options: CreateAppOptions = {}): Promise<ArenaAp
     });
   });
   await game.refresh();
+  if (options.autoPoll !== false) void game.recoverSettlements();
   let polling = false;
   const timer = options.autoPoll === false ? undefined : setInterval(async () => {
     if (polling) return;
     polling = true;
-    try { await game.refresh(); io.emit('snapshot', game.snapshot()); }
+    try { await game.refresh(); await game.recoverSettlements(); io.emit('snapshot', game.snapshot()); }
     finally { polling = false; }
   }, config.pollIntervalMs);
   timer?.unref();

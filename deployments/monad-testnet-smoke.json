@@ -1,71 +1,67 @@
 {
-  "formatVersion": 1,
-  "status": "complete",
-  "network": "Monad Testnet",
+  "protocol": "prepaid-auto-payout",
   "chainId": 10143,
-  "contractAddress": "0xc998eb98453f4c26Aba98D369E8C3895b8061085",
-  "createdAt": "2026-10-17T07:41:09.305Z",
-  "aiMode": "local-rules",
-  "agentRuntime": "pi-agent-core",
-  "note": "One real failed challenge settlement. Pi local-rules mode is not a live external model.",
-  "player": "0xb49a5CbB09A8875cd789DDDFfC32fbAE3442Fe48",
-  "challengeId": "0x997bce05290571a42a1a6bc2d2dca4325530bdb6d23d0de7a0da61175ae1f795",
-  "roundId": "1",
-  "result": {
-    "success": false,
-    "score": "10"
-  },
-  "challengeFeeWei": "10000000000000000000",
-  "estimatedGas": "339265",
-  "estimatedGasCostMON": "0.03460503",
-  "backendSignatureVerified": true,
-  "chatDidNotSubmitTransactions": true,
-  "transactionHash": "0xeb48d85850521dc9e9a945e71e25605a7737f8d77b038a62f066d8e4e930ce7b",
-  "transactionUrl": "https://testnet.monadscan.com/tx/0xeb48d85850521dc9e9a945e71e25605a7737f8d77b038a62f066d8e4e930ce7b",
-  "receiptStatus": "success",
-  "blockNumber": "71764191",
-  "gasUsed": "339265",
-  "effectiveGasPriceWei": "102000000000",
-  "gasCostMON": "0.03460503",
-  "verifiedAt": "2026-10-17T07:41:15.958Z",
-  "poolAfterWei": "8000000000000000000",
-  "contractBalanceAfterWei": "10000000000000000000",
-  "totalChallenges": 1,
-  "playerStats": {
-    "attempts": "1",
-    "successes": "0",
-    "score": "10",
-    "wins": "0"
-  },
-  "backendTracked": true,
-  "duplicateSettlementRejected": "ChallengeAlreadySettled",
-  "socketClientsVerified": 2,
-  "sharedChainConfirmed": true,
-  "piToolsExecuted": [
-    "get_game_state",
-    "get_player_stats",
-    "get_recent_events",
-    "inspect_vault",
-    "judge_challenge"
-  ],
-  "leaderboard": [
-    {
-      "address": "0xb49a5CbB09A8875cd789DDDFfC32fbAE3442Fe48",
-      "attempts": 1,
-      "successes": 0,
-      "score": 10,
-      "wins": 0
+  "contractAddress": "0x27D86752d07FFbdd2BBDE9d2cF91Ef2B69b04552",
+  "attempts": {
+    "live": {
+      "verifiedAt": "2026-10-17T08:31:42.637Z",
+      "protocol": "prepaid-auto-payout",
+      "chainId": 10143,
+      "contractAddress": "0x27D86752d07FFbdd2BBDE9d2cF91Ef2B69b04552",
+      "ai": {
+        "mode": "live",
+        "runtime": "pi-agent-core",
+        "toolsExecuted": [
+          "get_game_state",
+          "inspect_vault",
+          "get_player_stats",
+          "judge_challenge"
+        ],
+        "streamedText": true
+      },
+      "payer": "0xb49a5CbB09A8875cd789DDDFfC32fbAE3442Fe48",
+      "resultSignerAndRelayer": "0x5C821ed0eE711B1644Bf27b36B90b4514ef50F8a",
+      "challengeId": "0x174a98b8106462f6736c32c86182df4d14aed9dd44d5349517e67dd9d845e895",
+      "roundId": "1",
+      "messageCount": 2,
+      "success": true,
+      "score": "100",
+      "feeWei": "10000000000000000000",
+      "rewardWei": "4000000000000000000",
+      "entry": {
+        "hash": "0x152657d143d227d5985c35b03ad3658f16b6db8bd48b5cdda4a458604dbe5f96",
+        "url": "https://testnet.monadscan.com/tx/0x152657d143d227d5985c35b03ad3658f16b6db8bd48b5cdda4a458604dbe5f96",
+        "blockNumber": "71773888",
+        "gasUsed": "273920"
+      },
+      "settlement": {
+        "hash": "0xb41bd8364c7716cba3b6fbe69fbb61b77a855001d76de250d88182e5af65c64d",
+        "url": "https://testnet.monadscan.com/tx/0xb41bd8364c7716cba3b6fbe69fbb61b77a855001d76de250d88182e5af65c64d",
+        "blockNumber": "71774193",
+        "gasUsed": "320947",
+        "from": "0x5c821ed0ee711b1644bf27b36b90b4514ef50f8a",
+        "attachedWei": "0"
+      },
+      "payout": {
+        "automatic": true,
+        "separateClaimTransaction": false,
+        "recipient": "0xb49a5CbB09A8875cd789DDDFfC32fbAE3442Fe48",
+        "amountWei": "4000000000000000000",
+        "payerBalanceDeltaAfterEntryWei": "4000000000000000000"
+      },
+      "checks": [
+        "Unpaid dialogue is blocked.",
+        "Exactly 10 testnet MON was paid from the session wallet before chat opened.",
+        "Player nonce stayed unchanged throughout dialogue and settlement.",
+        "The backend signed and relayed the result with zero attached value.",
+        "A confirmed ChallengeSettled event matches the paid wallet and challenge.",
+        "Settlement retry created no second transaction.",
+        "RewardPaid and the payer balance prove automatic receipt with no claim transaction.",
+        "Finished challenges reject further messages.",
+        "Public Socket.IO events contain no private token.",
+        "Private Pi event stream observed actual tool execution."
+      ]
     }
-  ],
-  "checks": [
-    "backend signature verified",
-    "ordinary chat produced no chain settlement",
-    "exactly ten MON fee paid",
-    "real receipt and ChallengeSettled event confirmed",
-    "eight MON public pool recorded",
-    "ten points recorded on-chain",
-    "duplicate challenge simulation reverted",
-    "both socket observers received actual chain confirmation",
-    "transaction API matches actual receipt"
-  ]
+  },
+  "updatedAt": "2026-10-17T08:31:42.986Z"
 }

@@ -25,6 +25,11 @@
         "internalType": "uint256",
         "name": "roundDuration_",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "challengeDuration_",
+        "type": "uint256"
       }
     ],
     "stateMutability": "payable",
@@ -32,7 +37,17 @@
   },
   {
     "inputs": [],
+    "name": "ChallengeAlreadyEntered",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ChallengeAlreadySettled",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ChallengeNotEntered",
     "type": "error"
   },
   {
@@ -77,22 +92,12 @@
   },
   {
     "inputs": [],
-    "name": "NoReward",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ReentrancyGuardReentrantCall",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "ResultExpired",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "RewardAlreadyClaimed",
     "type": "error"
   },
   {
@@ -125,6 +130,43 @@
     "inputs": [],
     "name": "WrongRound",
     "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "challengeId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "expiresAt",
+        "type": "uint256"
+      }
+    ],
+    "name": "ChallengeEntered",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -241,13 +283,19 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "challengeId",
+        "type": "bytes32"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "RewardClaimed",
+    "name": "RewardPaid",
     "type": "event"
   },
   {
@@ -322,7 +370,7 @@
   },
   {
     "inputs": [],
-    "name": "challengeFee",
+    "name": "challengeDuration",
     "outputs": [
       {
         "internalType": "uint256",
@@ -334,16 +382,16 @@
     "type": "function"
   },
   {
-    "inputs": [
+    "inputs": [],
+    "name": "challengeFee",
+    "outputs": [
       {
         "internalType": "uint256",
-        "name": "roundId",
+        "name": "",
         "type": "uint256"
       }
     ],
-    "name": "claimReward",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -408,6 +456,24 @@
         "internalType": "bytes32",
         "name": "challengeId",
         "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      }
+    ],
+    "name": "enterChallenge",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "challengeId",
+        "type": "bytes32"
       }
     ],
     "name": "getChallenge",
@@ -458,6 +524,16 @@
             "internalType": "bool",
             "name": "settled",
             "type": "bool"
+          },
+          {
+            "internalType": "uint256",
+            "name": "enteredAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "expiresAt",
+            "type": "uint256"
           }
         ],
         "internalType": "struct RugArena.ChallengeRecord",
@@ -722,19 +798,6 @@
   },
   {
     "inputs": [],
-    "name": "reservedRewards",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "resultSigner",
     "outputs": [
       {
@@ -824,7 +887,7 @@
     ],
     "name": "settleChallenge",
     "outputs": [],
-    "stateMutability": "payable",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

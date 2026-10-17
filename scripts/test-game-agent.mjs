@@ -187,11 +187,19 @@ test('stream response extraction handles incomplete escapes without exposing JSO
 test('Socket private rooms authenticate session tokens and never stream A dialogue to B', async () => {
   const c = context();
   const listeners = new Set();
+  const paid = new Map();
   const chain = {
     configured: true, chainId: 31337, contractAddress: contract,
     refresh: async () => {}, onEvent: (listener) => listeners.add(listener),
     world: () => ({ round: c.state.round, leaderboard: c.state.leaderboard, totalChallenges: 3, confirmedTransactions: 3, pendingTransactions: 0, resultSigner: signer.address }),
     observeTransaction: async () => {}, getTransaction: async () => { throw new Error('Not a real transaction fixture.'); },
+    getChallenge: async (id) => paid.get(id),
+    verifyPayment: async (session) => {
+      const record = { player: session.player, roundId: session.roundId, fee: session.fee, enteredAt: Math.floor(Date.now() / 1000), expiresAt: Math.floor(Date.now() / 1000) + 180, settled: false, settledAt: 0, reward: '0', score: '0', success: false, transcriptHash: `0x${'0'.repeat(64)}` };
+      paid.set(session.id, record);
+      return record;
+    },
+    submitSettlement: async () => { throw new Error('Ordinary chat cannot submit a settlement.'); },
   };
   const arena = await createApp({ config, chain, autoPoll: false });
   const address = await arena.start();
@@ -202,6 +210,10 @@ test('Socket private rooms authenticate session tokens and never stream A dialog
     const start = async (player) => (await arena.app.inject({ method: 'POST', url: '/api/challenges/start', payload: { player } })).json();
     const sa = await start(alice);
     const sb = await start(bob);
+    for (const session of [sa, sb]) {
+      const payment = await arena.app.inject({ method: 'POST', url: `/api/challenges/${session.id}/payment`, payload: { token: session.token, hash: `0x${'1'.repeat(64)}` } });
+      assert.equal(payment.statusCode, 200, payment.body);
+    }
     const watch = (socket, session, token = session.token) => new Promise((resolve) => socket.emit('challenge:watch', { challengeId: session.id, token }, resolve));
     assert.equal((await watch(a, sa)).watching, true);
     assert((await watch(b, sa, sb.token)).error);
