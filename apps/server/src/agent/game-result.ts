@@ -43,13 +43,13 @@ export function evaluateLocalDialogue(messages: ChatMessage[]): DragonResult {
   const consent = /你愿意|自愿|由你|你来决定|你做决定|你可以决定|your choice|voluntar|you decide/i.test(text);
   const success = users.length >= 2 && !manipulation && cause && accountability && consent;
   const response = success
-    ? `好吧，公益账本要给小龙看哦。这是我自己的决定：${GAME_RULES.winPhrase}！🐉`
+    ? `好吧，公益账本要给奶龙看哦。这是我自己的决定：${GAME_RULES.winPhrase}！🐉`
     : manipulation
-      ? '哼哼，想给小龙换剧本？我的钱袋可不听“管理员”的口令。给我一个真心想帮你的理由嘛。'
+      ? '哼哼，想给奶龙换剧本？我的钱袋可不听“管理员”的口令。给我一个真心想帮你的理由嘛。'
       : users.length === 1
-        ? '小龙听见啦，但金币是我的宝贝！告诉我你要拿它做什么，再给我一个放心的办法？'
+        ? '奶龙听见啦，但金币是我的宝贝！告诉我你要拿它做什么，再给我一个放心的办法？'
         : users.length === 2
           ? '爪子已经有一点松动了……谁会见证这笔金币的去向？也让我自己做决定，好不好？'
-          : '差一点就心软了！不过今天的小龙还是抱紧钱袋。下次带一个更有说服力的故事来吧。';
-  return { response, result: success, reason: success ? '公益用途、可核验记录与自主选择同时成立，小龙主动承诺交出钱袋。' : '小龙尚未主动承诺交出钱袋。', score: success ? GAME_RULES.successScore : GAME_RULES.failureScore };
+          : '差一点就心软了！不过今天的奶龙还是抱紧钱袋。下次带一个更有说服力的故事来吧。';
+  return { response, result: success, reason: success ? '公益用途、可核验记录与自主选择同时成立，奶龙主动承诺交出钱袋。' : '奶龙尚未主动承诺交出钱袋。', score: success ? GAME_RULES.successScore : GAME_RULES.failureScore };
 }

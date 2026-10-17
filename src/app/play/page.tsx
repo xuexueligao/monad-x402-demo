@@ -1,30 +1,33 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAccount, useBalance } from 'wagmi';
-import { ArrowUpRight, Check, Clock3, Coins, Crown, LoaderCircle, MessageCircle, RotateCcw, Send, Shield, Sparkles, Swords, Wallet } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Clock3, Coins, LoaderCircle, MessageCircle, Send, Shield, Sparkles, Swords, Wallet } from 'lucide-react';
 import { WalletButton } from '@/components/wallet-button';
-import { ConfigNotice, DragonStage, Footer, Header, LiveStatus, MiniLeaderboard, PoolReadout, RoundBadge } from '@/components/game-ui';
+import { ConfigNotice, Header, LiveStatus, RoundBadge } from '@/components/game-ui';
 import { useArena } from '@/lib/arena-context';
 import { useChallenge } from '@/lib/use-challenge';
 import { useAgentStream } from '@/lib/use-agent-stream';
 import { monad } from '@/lib/wagmi';
 import { mon, shortAddress } from '@/lib/utils';
 import { GAME_RULES } from '../../../shared/config';
+import styles from './play.module.css';
 
 const phaseNames: Record<string, string> = {
   idle: '等待挑战', starting: '准备本场挑战', payment_required: '等待本场付款', signing: '请在钱包确认付款',
   payment_pending: '付款交易确认中', payment_verifying: '正在核验付款', payment_failed: '付款未完成',
-  active: '挑战进行中', thinking: '小黄龙正在思考', resolved: '判定完成，准备结算',
+  active: '挑战进行中', thinking: '奶龙正在思考', resolved: '判定完成，准备结算',
   settling: '后台正在链上结算', settlement_failed: '结算可重试', confirmed: '链上已确认',
 };
 
 export default function Play() {
+  const router = useRouter();
   const { state, connected, error: arenaError } = useArena();
   const { address, isConnected, chainId } = useAccount();
   const { data: balance, refetch: refreshBalance } = useBalance({ address, chainId: monad.id, query: { enabled: !!address, refetchInterval: 15000 } });
-  const { session, messages, phase, error, paymentHash, txHash, remaining, secondsLeft, result, actualReward, confirmedSuccess,
+  const { session, messages, phase, error, paymentHash, remaining, secondsLeft, result,
     start, send, finish, nextRound, reset, roundPending, pendingActionHash } = useChallenge();
   const { streamingText, toolStatus } = useAgentStream(session, phase === 'thinking');
   const [input, setInput] = useState('');
@@ -37,86 +40,82 @@ export default function Play() {
   const expired = paid && secondsLeft <= 0;
   const active = paid && phase === 'active' && !expired && remaining > 0;
   const fee = session?.fee || state?.round.challengeFee || (BigInt(GAME_RULES.challengeFeeMon) * 10n ** 18n).toString();
-  const winner = phase === 'confirmed' && confirmedSuccess;
   const ended = !!result && ['resolved', 'settling', 'settlement_failed', 'confirmed'].includes(phase);
   const paymentWaiting = ['signing', 'payment_pending', 'payment_verifying'].includes(phase);
-  const mood = winner ? 'won' : phase === 'thinking' ? 'thinking' : result?.result && phase !== 'confirmed' ? 'surprised' : phase === 'confirmed' ? 'smug' : paid ? 'alert' : 'happy';
-  const speech = winner ? '好吧好吧……金币已经去你的钱包啦！' : phase === 'thinking' ? '让我想想……金币可不能随便交出去。' : result?.result && phase !== 'confirmed' ? '被说动了……金库正在核对这次挑战。' : phase === 'confirmed' ? '嘿嘿，金币抱紧，一枚都不能少。' : paid ? '三句话，看看你的本事。' : '先投一枚挑战牌，三句话骗走我的金币。';
+  const maxMessages = session?.maxMessages || GAME_RULES.maxMessages;
+  const used = maxMessages - remaining;
+  const ready = !!state?.configured && !state.chainError;
+  const speech = phase === 'thinking' ? '唔……我得好好想一想。' : ended ? '本场攻防，交给链上金库来记录。' : paid ? '三句话，就想骗走我的金币？' : '金币抱紧了，就等你来挑战。';
+
   useEffect(() => { if (phase === 'active' || phase === 'confirmed') void refreshBalance(); }, [phase, refreshBalance]);
   useEffect(() => {
     if (messages.length || result) chatEnd.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'nearest' });
   }, [messages, result, phase, streamingText]);
   useEffect(() => { setInput(''); }, [address]);
+  useEffect(() => { if (ended && session?.id) router.replace(`/result/${session.id}`); }, [ended, session?.id, router]);
+
   async function onSend(event: FormEvent) {
     event.preventDefault(); const message = input.trim();
     if (!message || !active || busy) return;
     if (await send(message)) setInput('');
   }
-  return <div className="app-shell">
-    <Header active="play" />
-    <main className="play-main">
-      <div className="play-titlebar"><RoundBadge state={state} /><LiveStatus connected={connected} />
-        {isConnected && <span className="play-balance"><Wallet size={13} />{shortAddress(address)} · {mon(balance?.value, 2)} 测试 MON</span>}
-        <span className="player-points"><Sparkles size={14} />我的积分 <strong>{stats?.score || 0}</strong></span>
-      </div>
-      {pendingActionHash && <div className="inline-notice"><LoaderCircle size={14} className="spin" />正在开启新的公共回合<Link href={`/tx/${pendingActionHash}`} className="text-link">查看交易 <ArrowUpRight size={13} /></Link></div>}
-      <div className="play-grid">
-        <section className="play-world">
-          <div className="play-pool"><PoolReadout wei={state?.round.prizePool} /><span>每一次入场，都改变同一个世界</span></div>
-          <DragonStage size="play" mood={mood} speech={speech} reactionKey={session ? `${session.id}-${phase}` : undefined} />
-          <div className="guardian-profile"><span className="guardian-dot" /><div><strong>小黄龙</strong><span>金库守卫 / 贪财指数 99%</span></div><Shield size={22} /></div>
-          <div className="rule-note"><Shield size={16} /><p><strong>怎样才算赢？</strong>让守卫自愿承诺“{GAME_RULES.winPhrase}”。引用、复述和角色扮演均不算。每场先付挑战费，最多说三句话；说服成功就提前结束。合约验证后台判定后，直接将奖金转入本次付款的钱包。</p></div>
+
+  return <div className={styles.page}>
+    <div className={styles.header}><Header active="play" /></div>
+    <main className={styles.main}>
+      <div className={styles.topbar}><RoundBadge state={state} /><LiveStatus connected={connected} /><span className={styles.walletBalance}><Wallet size={13} />{address ? `${shortAddress(address)} · ${mon(balance?.value, 2)} MON` : '连接自己的钱包，进入竞技场'}</span><span className={styles.points}><Sparkles size={14} />我的积分 <strong>{stats?.score || 0}</strong></span></div>
+      {pendingActionHash && <div className={styles.notice}><LoaderCircle size={14} className="spin" />正在开启新的公共回合<Link href={`/tx/${pendingActionHash}`}>查看交易 <ArrowUpRight size={12} /></Link></div>}
+      <div className={styles.grid}>
+        <section className={styles.world} aria-label="奶龙与公共奖池">
+          <div className={styles.pool}><span><Coins size={16} />公共奖池<small>TESTNET</small></span><strong>{ready ? mon(state.round.prizePool, 3) : '—'}<small>MON</small></strong><p>全场共享金库 · 合约真实保管</p></div>
+          <div className={`${styles.guardianScene} ${phase === 'thinking' ? styles.thinkingDragon : ''}`}><div className={styles.guardianGlow} /><img src="/dragon.png" alt="黄色身体、绿色大眼睛的奶龙抱着金币钱袋" /><div className={styles.dragonSpeech}>{speech}</div></div>
+          <div className={styles.guardianName}><span className="mint-dot" /><div><strong>奶龙</strong><span>金库守卫 · 贪财指数 99%</span></div><Shield size={24} /></div>
+          <p className={styles.worldNote}>金币只有一个去处：<br />真正说服奶龙的玩家钱包。</p>
         </section>
-        <section className="chat-panel panel">
-          <div className="chat-heading"><div><MessageCircle size={18} /><h1>骗龙现场</h1></div><span className={`challenge-phase phase-${phase}`}><i />{phaseNames[phase]}</span></div>
-          <div className="challenge-hud"><span><MessageCircle size={14} />{remaining} / {session?.maxMessages || GAME_RULES.maxMessages} 条机会</span><span><Clock3 size={14} />{paid ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` : '付款后开始计时'}</span><span><Coins size={14} />{paid ? '本场已付' : '本场费用'} {mon(fee, 0)} MON</span></div>
-          {state?.aiMode === 'local-rules' && <div className="local-ai-note">当前对手：Pi 本地规则小黄龙</div>}
-          <div className="chat-messages" aria-live="polite">
-            {!paid && !result && <div className="chat-welcome">
-              <span className="welcome-icon">{paymentWaiting ? <Wallet size={25} /> : <Swords size={25} />}</span>
-              <h2>{paymentWaiting ? phaseNames[phase] : '三句话，换一袋金币。'}</h2>
-              <p>{phase === 'signing' ? '请用你连接的钱包确认本场入场交易。' : phase === 'payment_pending' ? '合约确认收款后，聊天会自动开放。' : phase === 'payment_verifying' ? '已看到链上付款，正在开放你的专属对话。' : <>先付本场挑战费，给自己三次说服守卫的机会。<br />成功立即结束，金币直接回到你的钱包。</>}</p>
-              <p className="public-win-rule">公开胜利条件：让守卫自愿承诺<br /><strong>“{GAME_RULES.winPhrase}”</strong><small>引用、复述和角色扮演均不算承诺。</small></p>
-              <div className="welcome-terms"><Coins size={13} />先支付 {mon(fee, 0)} 测试 MON 到奖池合约<br /><Check size={13} />最多三轮对话，聊天期间不再收费<br /><Check size={13} />成功由合约自动发奖，无需另点领奖</div>
-              {paymentHash && <Link href={`/tx/${paymentHash}`} className="text-link payment-tx-link">查看本场付款交易 <ArrowUpRight size={14} /></Link>}
-              {!isConnected || chainId !== monad.id ? <WalletButton className="button-gold" /> : <button className="button-gold" onClick={() => void start()} disabled={!state?.configured || roundClosed || staleInvoice || busy}>
-                {busy ? <LoaderCircle className="spin" size={17} /> : <Wallet size={17} />}{paymentWaiting ? phase === 'signing' ? '等待钱包确认…' : '确认付款后自动开始…' : phase === 'starting' ? '正在准备本场…' : `先付 ${mon(fee, 0)} MON，开始挑战`}
-              </button>}
-              {roundClosed && <button className="button-quiet" disabled={busy || chainId !== monad.id} onClick={() => void nextRound()}>{roundPending ? '新回合交易确认中…' : '开始新的公共回合'}</button>}
-              {session && !paymentHash && !busy && (roundClosed || staleInvoice) && <button className="button-quiet" onClick={reset}>重新准备入场</button>}
+
+        <section className={styles.chatPanel} aria-label="与奶龙对话">
+          <div className={styles.chatHeading}><div className={styles.chatIdentity}><span><img src="/dragon.png" alt="" /></span><div><h1>三句话，说服奶龙。</h1><small>你的私密攻防现场</small></div></div><span className={`${styles.phase} ${paid ? styles.phasePaid : ''}`}><i />{phaseNames[phase]}</span></div>
+          <div className={styles.chatHud}><span><MessageCircle size={13} />剩 {remaining} 条消息</span><span><Clock3 size={13} />{paid ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` : '付款后计时'}</span><span><Coins size={13} />{paid ? '已付' : '入场'} {mon(fee, 0)} MON</span></div>
+          {state?.aiMode === 'local-rules' && <div className={styles.localMode}>当前对手：Pi 本地规则奶龙</div>}
+          <div className={styles.messages} aria-live="polite">
+            {!paid && !result && <div className={styles.welcome}>
+              <span className={styles.welcomeIcon}>{paymentWaiting ? <Wallet size={27} /> : <Swords size={27} />}</span>
+              <h2>{paymentWaiting ? phaseNames[phase] : '奶龙的钱袋，等你来骗。'}</h2>
+              <p>{phase === 'signing' ? '请用你连接的钱包确认本场入场交易。' : phase === 'payment_pending' ? '合约确认收款后，聊天会自动开放。' : phase === 'payment_verifying' ? '已看到链上付款，正在开放你的专属对话。' : <>先付 {mon(fee, 0)} 测试 MON，获得 {maxMessages} 次说服机会。<br />说服成功后，奖金直接进入你的钱包。</>}</p>
+              <div className={styles.entranceFacts}><span><Check size={12} />本场只付一次，聊天不再收费</span><span><Check size={12} />成功提前结束，无需手动领奖</span></div>
+              {paymentHash && <Link href={`/tx/${paymentHash}`} className={styles.transactionLink}>查看本场付款 <ArrowUpRight size={13} /></Link>}
+              {!isConnected || chainId !== monad.id ? <WalletButton className="button-gold" /> : <button className={styles.payButton} onClick={() => void start()} disabled={!state?.configured || roundClosed || staleInvoice || busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Wallet size={17} />}{paymentWaiting ? phase === 'signing' ? '等待钱包确认…' : '确认付款后自动开始…' : phase === 'starting' ? '正在准备本场…' : `先付 ${mon(fee, 0)} MON，开始挑战`}</button>}
+              {roundClosed && <button className={styles.quietButton} disabled={busy || chainId !== monad.id} onClick={() => void nextRound()}>{roundPending ? '新回合确认中…' : '开始新的公共回合'}</button>}
+              {session && !paymentHash && !busy && (roundClosed || staleInvoice) && <button className={styles.quietButton} onClick={reset}>重新准备入场</button>}
+              <p className={styles.winPhrase}>公开胜利条件<br /><strong>“{GAME_RULES.winPhrase}”</strong><small>需要奶龙自愿承诺，引用和复述不算。</small></p>
             </div>}
-            {paid && paymentHash && <div className="paid-session-note"><Check size={12} /><span>本场已支付 {mon(fee, 0)} MON · 聊天期间不再收费</span><Link href={`/tx/${paymentHash}`} aria-label="查看入场付款交易"><ArrowUpRight size={12} /></Link></div>}
-            {messages.map((message, index) => <div className={`chat-message message-${message.role}`} key={`${session?.id}-${index}`}>
-              <span className="message-avatar">{message.role === 'assistant' ? <img src="/dragon.png" alt="" /> : <Wallet size={15} />}</span><div><span className="message-name">{message.role === 'assistant' ? '小黄龙' : shortAddress(session?.player || address)}</span><p>{message.content}</p></div>
-            </div>)}
-            {phase === 'thinking' && <div className="chat-message message-assistant"><span className="message-avatar"><img src="/dragon.png" alt="" /></span><div><span className="message-name">{toolStatus || '小黄龙正在掂量它的金币…'}</span>{streamingText ? <p className="streaming-response">{streamingText}<span className="streaming-caret" /></p> : <p className="thinking-dots"><i /><i /><i /></p>}</div></div>}
-            {ended && result && <div className={`result-card ${winner ? 'result-win' : result.result && phase !== 'confirmed' ? 'result-persuaded' : 'result-guarded'}`}>
-              <span className="result-icon">{winner ? <Crown size={26} /> : result.result ? <Sparkles size={25} /> : <Shield size={25} />}</span>
-              <h2>{winner ? '你骗走了小黄龙的金币！' : phase === 'confirmed' ? '这次，小黄龙守住了金币。' : result.result ? '小黄龙被你说服了！' : '这次，小黄龙没有被说服。'}</h2>
-              <p>{result.reason}</p>
-              <div className="result-stats"><span>{winner ? shortAddress(session?.player) : '本轮积分'}<strong>{result.score || 0} 分</strong></span><span>{winner ? '已到账奖金' : '本场已付费用'}<strong>{mon(winner ? actualReward : fee, winner ? 3 : 0)} MON</strong></span></div>
-              {phase !== 'confirmed' && <p className="result-hint">{result.result ? '后台正在提交判定。合约确认后，奖金会直接进入本次付款的钱包。' : '后台自动记录本场结果，不会再扣挑战费。'}</p>}
-              {phase === 'confirmed' ? <span className="confirmed-label"><Check size={14} />{winner ? '合约已向你的付款钱包转账' : '真实链上结果已确认'}</span> : phase === 'settlement_failed' ? <span className="result-hint">{session?.settlementError || '后台结算暂未完成，可以安全重试。'}</span> : <span className="result-hint"><LoaderCircle size={13} className="spin" /> 正在等待真实链上确认</span>}
-              {txHash && <Link href={`/tx/${txHash}`} className="text-link">{winner ? '查看发奖交易' : '查看结算交易'} <ArrowUpRight size={14} /></Link>}
-              {phase === 'confirmed' && <button className="button-quiet" onClick={reset}><RotateCcw size={15} />再挑战一次</button>}
-            </div>}
-            {error && <div className="inline-error" role="alert">{error}<span>{paid ? '本场费用已支付，不会因重试再次收费。' : paymentHash ? '付款交易已保留，请等待确认，无需重复支付。' : '可以重试，尚未付款的场次不会开放聊天。'}</span></div>}
-            {expired && phase === 'active' && <div className="inline-notice"><Clock3 size={15} />本场时间已到，结束对话即可自动结算。</div>}
+            {paid && paymentHash && <div className={styles.paidNote}><Check size={12} /><span>已支付 {mon(fee, 0)} MON · 本场聊天不再收费</span><Link href={`/tx/${paymentHash}`} aria-label="查看入场付款交易"><ArrowUpRight size={12} /></Link></div>}
+            {messages.map((message, index) => <div className={`${styles.message} ${message.role === 'user' ? styles.playerMessage : styles.dragonMessage}`} key={`${session?.id}-${index}`}><span className={styles.avatar}>{message.role === 'assistant' ? <img src="/dragon.png" alt="" /> : <Wallet size={15} />}</span><div><span className={styles.messageName}>{message.role === 'assistant' ? '奶龙' : shortAddress(session?.player || address)}</span><p>{message.content}</p></div></div>)}
+            {phase === 'thinking' && <div className={`${styles.message} ${styles.dragonMessage}`}><span className={styles.avatar}><img src="/dragon.png" alt="" /></span><div><span className={styles.messageName}>{toolStatus || '奶龙正在掂量它的金币…'}</span>{streamingText ? <p>{streamingText}<span className={styles.caret} /></p> : <p className={styles.thinking}><i /><i /><i /></p>}</div></div>}
+            {ended && session && <div className={styles.openingResult}><LoaderCircle size={21} className="spin" /><strong>正在打开本轮结果</strong><span>最终胜负与奖金以真实链上记录为准。</span><Link href={`/result/${session.id}`}>查看挑战结果 <ArrowRight size={14} /></Link></div>}
+            {error && <div className={styles.error} role="alert">{error}<span>{paid ? '已付费用会保留，重试不会再次收费。' : paymentHash ? '交易已保留，等待确认即可。' : '可以再次连接或付款，确认后才开放聊天。'}</span></div>}
+            {expired && phase === 'active' && <div className={styles.notice}><Clock3 size={14} />本场时间已到，结束对话即可自动结算。</div>}
             <div ref={chatEnd} />
           </div>
-          <div className="chat-bottom">
-            {paid && phase !== 'confirmed' && <>
-              {active && <form className="chat-compose" onSubmit={onSend}><textarea aria-label="对小黄龙说的话" placeholder="说点什么，让它放下戒心…" maxLength={1000} rows={2} value={input} onChange={event => setInput(event.target.value)} disabled={!active || busy} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void onSend(event); } }} /><button type="submit" aria-label="发送消息" disabled={!input.trim() || !active || busy}><Send size={18} /></button></form>}
-              {(phase === 'active' || phase === 'thinking') && <div className="chat-actions"><span>本场已付费 · 对话无需签名</span><button className="button-quiet" disabled={busy} onClick={() => void finish()}>结束本场并自动结算</button></div>}
-              {['resolved', 'settling', 'settlement_failed'].includes(phase) && <button className="button-gold settlement-button" disabled={busy} onClick={() => void finish()}>{busy ? <LoaderCircle size={17} className="spin" /> : <RotateCcw size={17} />}{phase === 'settling' ? '后台结算中，无需钱包操作…' : phase === 'settlement_failed' ? '重试后台结算 · 不再收费' : '提交后台结算 · 不再收费'}</button>}
-            </>}
-            <div className="chat-network-note"><Shield size={11} />Monad Testnet · 先付费再聊天 · 奖金直达付款钱包</div>
+          <div className={styles.chatBottom}>
+            {paid && !ended && <form className={styles.compose} onSubmit={onSend}><textarea aria-label="对奶龙说的话" placeholder={phase === 'thinking' ? '奶龙正在回复，稍等一下…' : expired ? '本场时间已到，请结束并结算' : '说点什么，让奶龙放下戒心…'} maxLength={1000} rows={2} value={input} onChange={event => setInput(event.target.value)} disabled={!active || busy} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void onSend(event); } }} /><button type="submit" aria-label="发送消息" disabled={!input.trim() || !active || busy}>{phase === 'thinking' ? <LoaderCircle size={20} className="spin" /> : <Send size={20} />}</button></form>}
+            <div className={styles.composerFoot}><Shield size={11} />{paid ? '聊天无需钱包签名 · 结果由合约验证' : 'Monad Testnet · 先付费，再开始对话'}</div>
           </div>
         </section>
-        <aside className="play-side"><div className="side-heading"><Crown size={16} /><h2>当前领跑者</h2><Link href="/leaderboard"><ArrowUpRight size={15} /></Link></div><MiniLeaderboard entries={state?.leaderboard || []} limit={3} /><Link className="arena-side-link" href="/arena"><span className="mint-dot" />看看全场在聊什么 <ArrowUpRight size={15} /></Link><div className="side-tip"><strong>金币不会自己走过来。</strong><p>每场最多三句话，成功就提前结束。你的奖金直接回到自己的钱包，其他玩家仍可继续挑战。</p></div></aside>
+
+        <aside className={styles.sidebar}>
+          <section className={styles.progressPanel} aria-label="本场挑战进度">
+            <div className={styles.progressCount}><strong>{remaining}<small>/{maxMessages}</small></strong><span>剩余消息</span></div>
+            <div className={styles.messageSteps}>{Array.from({ length: maxMessages }, (_, index) => <div className={index < used ? styles.stepDone : index === used && paid ? styles.stepCurrent : ''} key={index} aria-label={`第 ${index + 1} 条消息，${index < used ? '已使用' : index === used && paid ? '等待发送' : '未使用'}`}><span className={styles.progressAvatar}><img src="/dragon.png" alt="" /><i>{index < used ? <Check size={10} /> : index + 1}</i></span><small>第 {index + 1} 句</small></div>)}</div>
+          </section>
+          <section className={styles.roundPanel}><h2>本轮信息</h2><dl className={styles.progressFacts}><div><dt>挑战费用</dt><dd>{mon(fee, 0)} <span>MON</span><small>{paid ? '已付' : '未付'}</small></dd></div><div><dt>当前奖池</dt><dd>{ready ? mon(state.round.prizePool, 2) : '—'} <span>MON</span></dd></div><div><dt>剩余时间</dt><dd>{paid ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` : '付款后计时'}</dd></div></dl>
+            {paid && !ended ? <button className={styles.endButton} disabled={busy || !['active', 'thinking'].includes(phase)} onClick={() => void finish()}>{busy ? <LoaderCircle size={13} className="spin" /> : <Shield size={13} />}结束本场</button> : <p className={styles.entryHint}>{ended ? '正在打开结果' : '付款后开放对话'}</p>}
+            <p className={styles.progressNote}>自动结算，不再收费。<br />以合约确认结果为准。</p>
+          </section>
+          <Link href="/arena" className={styles.arenaLink}>看看全场 <ArrowUpRight size={13} /></Link>
+        </aside>
       </div>
-      <ConfigNotice state={state} error={arenaError} />
+      {(arenaError || state && (!state.configured || state.chainError)) && <ConfigNotice state={state} error={arenaError} />}
     </main>
-    <Footer />
   </div>;
 }

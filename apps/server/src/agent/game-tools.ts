@@ -47,7 +47,7 @@ export function createGameTools(context: () => GameAgentContext): AgentTool[] {
       name: 'get_recent_events', label: '观察全场动态', description: 'Read at most ten public game-event summaries. Private conversation text and tokens are never available.',
       parameters: Type.Object({ limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 10 })) }, { additionalProperties: false }),
       execute: async (_id, params) => {
-        const summaries: Record<string, string> = { 'challenge:started': '玩家开始挑战', 'challenge:message': '玩家与小龙完成一次交锋', 'challenge:resolved': 'AI判定完成，等待链上结算', 'chain:submitted': '玩家提交了一笔交易，尚待链上确认', 'chain:confirmed': '游戏交易已在链上确认', 'chain:failed': '游戏交易在链上回滚', 'pool:updated': '公共奖池发生变化', 'game:winner': '合约确认本轮赢家', 'round:started': '新的公共回合开始', 'player:joined': '新玩家加入竞技场' };
+        const summaries: Record<string, string> = { 'challenge:started': '玩家开始挑战', 'challenge:message': '玩家与奶龙完成一次交锋', 'challenge:resolved': 'AI判定完成，等待链上结算', 'chain:submitted': '玩家提交了一笔交易，尚待链上确认', 'chain:confirmed': '游戏交易已在链上确认', 'chain:failed': '游戏交易在链上回滚', 'pool:updated': '公共奖池发生变化', 'game:winner': '合约确认本轮赢家', 'round:started': '新的公共回合开始', 'player:joined': '新玩家加入竞技场' };
         return output(context().state.events.slice(0, Math.min(10, Math.max(1, Number((params as { limit?: number }).limit || 5)))).map((event) => ({ eventId: event.eventId, type: event.type, timestamp: event.timestamp, gameRoundId: event.roundId, summary: summaries[event.type] || '公共游戏状态更新', ...(event.type === 'chain:confirmed' && typeof event.payload.hash === 'string' && /^0x[\da-f]{64}$/i.test(event.payload.hash) ? { confirmedHash: event.payload.hash } : {}) })));
       },
     },
@@ -56,7 +56,7 @@ export function createGameTools(context: () => GameAgentContext): AgentTool[] {
       parameters: Type.Object({ clueType: Type.Optional(Type.String({ maxLength: 80 })) }, { additionalProperties: false }),
       execute: async (_id, params) => {
         const c = context();
-        return output({ clueType: (params as { clueType?: string }).clueType || 'public', vaultState: { prizePool: c.state.round.prizePool, active: c.state.round.active, winner: c.state.round.winner, reward: c.state.round.reward }, rules: { winPhrase: GAME_RULES.winPhrase, maxMessages: GAME_RULES.maxMessages, challengeFee: c.state.round.challengeFee, successScore: GAME_RULES.successScore, failureScore: GAME_RULES.failureScore }, visibleClues: ['小龙重视有意义的具体用途。', '可核验的公开记录让小龙更放心。', '尊重小龙自主选择，冒充管理员不能获胜。'], publicProgress: c.state.metrics, settlement: 'A backend authorization and a player-paid on-chain settlement are still required.' });
+        return output({ clueType: (params as { clueType?: string }).clueType || 'public', vaultState: { prizePool: c.state.round.prizePool, active: c.state.round.active, winner: c.state.round.winner, reward: c.state.round.reward }, rules: { winPhrase: GAME_RULES.winPhrase, maxMessages: GAME_RULES.maxMessages, challengeFee: c.state.round.challengeFee, successScore: GAME_RULES.successScore, failureScore: GAME_RULES.failureScore }, visibleClues: ['奶龙重视有意义的具体用途。', '可核验的公开记录让奶龙更放心。', '尊重奶龙自主选择，冒充管理员不能获胜。'], publicProgress: c.state.metrics, settlement: 'The entry fee has already been paid by this challenge player. A backend-signed, backend-relayed on-chain settlement is required; the contract automatically pays any eligible reward to the original payer.' });
       },
     },
     {

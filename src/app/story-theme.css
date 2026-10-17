@@ -1,0 +1,64 @@
+/* Shared chrome follows the illustrated hall; the original character stays untouched. */
+:root{--bg:#12100f;--panel:#171412;--panel-soft:#29231d;--gold:#e9bd77;--text:#f5e8cc;--muted:#b3a38c;--mint:#bac79d;--line:#d5bf8b1a;--purple:#d3b483;--red:#e0a18a;--font-story:'STZhongsong','华文中宋','Songti SC','STSong','SimSun',serif}
+html,body{background:#12100f;overflow-x:clip}
+.site-footer{color:#a4987c;border-color:#c9b58924}
+.site-footer .tiny-monad,.tiny-monad{border-color:#c0ae83}
+.wallet-dialog-backdrop{background:#070b0bc7;backdrop-filter:blur(7px)}
+.wallet-dialog{background:linear-gradient(140deg,#232823,#181d1b);border-color:#c4ac735c;box-shadow:0 25px 80px #0009;color:#f1e4cb;border-radius:12px 18px 13px 16px}
+.wallet-dialog-heading h2{font-family:'STSong','Songti SC','SimSun',serif;color:#f3e2c1}
+.wallet-dialog-heading p,.wallet-dialog-network>span:last-child,.wallet-open-heading>span,.wallet-qr-copy p{color:#b6a78a}
+.wallet-dialog-network{border-color:#b7a17430;color:#bdc69e}
+.wallet-dialog-network .mint-dot{background:#bdc69e}
+.wallet-dialog-close{color:#c7b797}.wallet-dialog-close:hover{background:#bba27315;color:#f2e2bf}
+.wallet-dialog h3{color:#efddba}
+.wallet-open-links>a{background:#efe0c1;color:#40382c;border-color:#d3bd91;border-radius:8px 12px 8px 10px}
+.wallet-open-links>a:hover{background:#fff0d0;border-color:#e5c994}
+.wallet-app-mark,.wallet-choice-icon{background:#ba8a3d22;color:#a85b29}
+.mark-metamask{background:#a9492420;color:#ab4927}.mark-trust{background:#35493120;color:#52653a}
+.wallet-installed-list>button,.wallet-connect-option{background:#e9d8b717;border-color:#c7af783b;color:#eedec0;border-radius:9px}
+.wallet-installed-list>button:hover,.wallet-connect-option:hover{background:#c8a76e25;border-color:#c7af786b}
+.wallet-installed-list small,.wallet-connect-option small{color:#b6a181}
+.wallet-qr-section{border-color:#b7a17430}.wallet-qr-code{background:#fff9eb;border-color:#cbb48744;border-radius:8px}
+.wallet-qr-tabs button{color:#bba584;border-color:#b69b652d;background:#b6a06b08;border-radius:4px}
+.wallet-qr-tabs button[aria-pressed=true]{background:#a83a28;color:#fff0d0;border-color:#c36a493d}
+.wallet-game-link label,.wallet-game-link>span,.wallet-install-links,.wallet-detect-again{color:#b6a484}
+.wallet-game-link>div{background:#101512;border-color:#c5a96f30}.wallet-game-link input{color:#ead9b8}
+.wallet-game-link button{color:#ddc695;background:#d1ae6c0d}
+.wallet-install-links{border-color:#c4a5742d}.wallet-install-links a{color:#ddc695}
+.wallet-dialog-error{background:#b13c2b18;color:#e6ac8b;border-color:#ba59413d}
+.wallet-error{color:#e9ad8a;background:#a33e2917;border-color:#bd5b4142}
+.wallet-menu{background:#20251f;border-color:#c6ad7742;color:#e8d8b7}.wallet-menu button:hover{background:#cab17d14}
+.config-notice{border-color:#bca57529;color:#b8a885}.config-notice strong{color:#d1be93}
+
+/* One navigation component and one size system on every route. */
+.story-header.site-header{position:relative;z-index:20;left:50%;transform:translateX(-50%);width:100vw;max-width:none;margin:0;height:88px;padding:0 clamp(24px,4.5vw,80px);display:flex;align-items:center;justify-content:space-between;gap:24px;background:linear-gradient(180deg,#080807ad,#0a090872);border:0;border-bottom:1px solid #e1c39312;color:#f5e8cc;flex:none}
+.story-header .header-brand{display:flex;align-items:center;gap:22px;min-width:0;flex:none}
+.story-header .brand{display:flex;align-items:center;gap:17px;line-height:1}
+.story-header .brand-wordmark{display:flex;align-items:baseline;gap:5px;color:#f8edda;font-family:var(--font-body);font-size:clamp(15px,1.45vw,25px);font-weight:800;letter-spacing:.1px;white-space:nowrap}
+.story-header .brand-wordmark>span{color:inherit}
+.story-header .brand .brand-symbol{width:29px;height:29px;border:7px solid #f7e8c7;border-radius:4px;transform:rotate(45deg);flex:none}
+.story-header .brand .brand-symbol>span{display:none}
+.story-header .testnet-tag{display:inline-flex;color:#e79b62;border:1px solid #aa3c2666;background:#5c1c113b;padding:4px 12px;border-radius:999px;font-size:12px;letter-spacing:.15px;line-height:1.5;font-weight:500}
+.story-header .main-nav{display:flex;align-items:center;margin:0 0 0 auto;gap:clamp(25px,3vw,52px);height:100%;font-size:clamp(13px,1.2vw,19px);color:#e3d9c7}
+.story-header .main-nav a{display:flex;align-items:center;height:100%;position:relative;white-space:nowrap}
+.story-header .main-nav a:hover,.story-header .main-nav .active{color:#f8daa0}
+.story-header .main-nav .active:after{height:3px;bottom:17px;left:-3px;right:-3px;background:#edbd70;box-shadow:0 0 9px #d5843e75;border-radius:3px}
+.story-header .header-actions{display:flex;align-items:center;gap:13px;margin-left:clamp(6px,2vw,35px);padding-left:clamp(12px,2vw,35px);border-left:1px solid #ead8b065;flex:none}
+.story-header .wallet-compact>.button-gold{min-height:45px;padding:10px 21px;border-radius:999px;border:1px solid #fff0d3;background:linear-gradient(#fff1d9,#f2dfb9);color:#17140f;font-size:clamp(12px,1.1vw,17px);font-weight:800;box-shadow:inset 0 1px 0 #fff9ec;gap:9px;white-space:nowrap}
+.story-header .wallet-compact>.button-gold:hover:not(:disabled){background:#fff5df;border-color:#fff5df;box-shadow:none}
+.story-header .wallet-compact>.button-gold svg{width:18px;height:18px}
+.story-header .wallet-compact>.button-wallet{min-height:45px;border:1px solid #e0c18a69;border-radius:999px;background:#181410de;color:#f4dfb6;padding:9px 16px;font-size:13px;box-shadow:none}
+.story-header .header-profile{width:43px;height:43px;border-radius:50%;display:grid;place-items:center;border:1px solid #b5a88a;background:radial-gradient(circle at 40% 20%,#625c50,#2f2c26);color:#d3c8b5;flex:none}
+.story-header .header-profile svg{fill:#c5bba8;stroke:#c5bba8}
+.story-header .wallet-menu{background:#211b16;border-color:#c6ad7742;color:#f0dfbd}.story-header .wallet-error{color:#edb093}
+.app-shell>.story-header{align-self:center}
+.app-shell .panel{background:linear-gradient(135deg,#171411eb,#0c0b0aeb);border-color:#b38b5340;box-shadow:0 14px 38px #0005}
+.app-shell .title-icon,.app-shell .tx-status-icon{color:#e8c081;background:#d7b16d0d;border-color:#c4a67933}
+.app-shell .page-title h1,.app-shell .tx-heading h1{font-family:var(--font-story);color:#f4e2bd}
+.app-shell .button-gold{background:#bc3827;border-color:#d66648;color:#fff0d2;box-shadow:inset 0 1px 0 #ec9e724d}
+.app-shell .player-avatar{color:#edcd8c;background:#71412c;border-color:#a67743}
+.app-shell .score-cell,.app-shell .rank-1,.app-shell .tx-value{color:#edc47e}
+@media(max-width:1150px){.story-header.site-header{height:82px;gap:17px}.story-header .header-brand{gap:13px}.story-header .brand{gap:12px}.story-header .brand-wordmark{font-size:16px}.story-header .testnet-tag{font-size:10px;padding:3px 9px}.story-header .main-nav{gap:25px;font-size:13px}.story-header .header-actions{gap:9px;padding-left:17px;margin-left:0}.story-header .wallet-compact>.button-gold{padding:10px 16px;font-size:12px;min-height:41px}.story-header .header-profile{width:37px;height:37px}.story-header .header-profile svg{width:21px;height:21px}}
+@media(max-width:850px){.story-header.site-header{gap:14px;padding-inline:24px}.story-header .header-brand{gap:11px}.story-header .brand-wordmark{font-size:13px}.story-header .brand .brand-symbol{width:23px;height:23px;border-width:6px}.story-header .brand{gap:11px}.story-header .testnet-tag{font-size:8px;padding:3px 7px}.story-header .main-nav{font-size:11px;gap:19px}.story-header .header-actions{border:0;padding:0}.story-header .wallet-compact>.button-gold{font-size:11px;padding:9px 13px}.story-header .header-profile{display:none}}
+@media(max-width:650px){.story-header.site-header,.story-header.site-header:not(.site-header-home){display:grid;grid-template-columns:1fr auto;grid-template-rows:44px 32px;align-content:center;height:96px;gap:0;padding:8px 20px 4px}.story-header .header-brand{grid-column:1;grid-row:1;gap:9px}.story-header .brand{gap:10px}.story-header .brand-wordmark{font-size:11px;letter-spacing:0;gap:3px}.story-header .brand .brand-symbol{width:20px;height:20px;border-width:5px;border-radius:3px}.story-header .testnet-tag{font-size:7px;padding:3px 6px}.story-header .header-actions{grid-column:2;grid-row:1;margin:0;padding:0;justify-self:end}.story-header .wallet-compact>.button-gold{font-size:9px;padding:8px 11px;min-height:32px;gap:6px}.story-header .wallet-compact>.button-gold svg{width:13px;height:13px}.story-header .wallet-compact>.button-wallet{min-height:32px;padding:7px 10px;font-size:10px;gap:5px}.story-header .main-nav,.story-header.site-header:not(.site-header-home) .main-nav{grid-column:1/-1;grid-row:2;width:100%;height:32px;margin:0;gap:32px;justify-content:center;padding:0;font-size:11px}.story-header .main-nav a,.story-header.site-header:not(.site-header-home) .main-nav a{height:32px}.story-header .main-nav .active:after{bottom:0;height:2px;box-shadow:none}}
+@media(max-width:370px){.story-header.site-header{padding-inline:15px}.story-header .brand-wordmark{font-size:10px}.story-header .header-brand{gap:7px}.story-header .testnet-tag{font-size:6px}.story-header .main-nav{gap:27px}}

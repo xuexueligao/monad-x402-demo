@@ -1,14 +1,31 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { Activity, ArrowUpRight, Check, Coins, Crown, MessageCircle, Shield, Sparkles, Swords, Wallet } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useAccount } from 'wagmi';
+import { Activity, ArrowUpRight, Check, Coins, Crown, MessageCircle, Shield, Sparkles, Swords, UserRound, Wallet } from 'lucide-react';
 import { WalletButton } from '@/components/wallet-button';
+import { useArena } from '@/lib/arena-context';
+import { monad } from '@/lib/wagmi';
 import type { GameEvent, GameSnapshot, LeaderboardEntry } from '@/lib/types';
 import { ago, mon, shortAddress } from '@/lib/utils';
 
-export function Header({ active, wallet = true }: { active?: string; wallet?: boolean }) {
-  return <header className="site-header"><Link className="brand" href="/" aria-label="MONAD RUG ARENA 首页"><span className="brand-symbol"><span /></span><span>MONAD<span className="brand-sub">RUG ARENA</span></span></Link><nav className="main-nav" aria-label="主导航"><Link className={active === 'play' ? 'active' : ''} href="/play">开始挑战</Link><Link className={active === 'arena' ? 'active' : ''} href="/arena">现场大屏</Link><Link className={active === 'leaderboard' ? 'active' : ''} href="/leaderboard">排行榜</Link></nav><div className="header-actions"><span className="testnet-tag"><i />TESTNET</span>{wallet && <WalletButton compact />}</div></header>;
+export function Header({ active, wallet = true, home = false }: { active?: string; wallet?: boolean; home?: boolean }) {
+  const router = useRouter();
+  const { address } = useAccount();
+  const { state } = useArena();
+  function openMyChallenge(event: MouseEvent<HTMLAnchorElement>) {
+    if (!address || !state?.contractAddress) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(`rug-arena:prepaid-v1:${monad.id}:${state.contractAddress}:${address.toLowerCase()}`) || '{}');
+      const session = saved.session;
+      if (session?.player?.toLowerCase() === address.toLowerCase() && /^0x[\da-f]{64}$/i.test(session.id) && ['resolved', 'settling', 'settled', 'settlement_failed'].includes(session.status)) {
+        event.preventDefault(); router.push(`/result/${session.id}`);
+      }
+    } catch { /* A missing local record simply opens the current challenge. */ }
+  }
+  return <header className="site-header story-header" data-home={home || undefined}><div className="header-brand"><Link className="brand" href="/" aria-label="MONAD RUG ARENA 首页"><span className="brand-symbol"><span /></span><span className="brand-wordmark">MONAD <span>RUG ARENA</span></span></Link><span className="testnet-tag">TESTNET</span></div><nav className="main-nav" aria-label="主导航"><Link className={active === 'play' || home ? 'active' : ''} href="/play" aria-label="Play · 开始挑战">Play</Link><Link className={active === 'result' ? 'active' : ''} href="/play" onClick={openMyChallenge} aria-label="My · 我的挑战">My</Link><Link className={active === 'leaderboard' ? 'active' : ''} href="/leaderboard">Leaderboard</Link><a href="https://github.com/xuexueligao/monad-x402-demo#readme" target="_blank" rel="noopener noreferrer">About</a></nav><div className="header-actions">{wallet && <WalletButton compact label="Connect Wallet" />}<Link className="header-profile" href="/play" onClick={openMyChallenge} aria-label="我的挑战"><UserRound size={24} /></Link></div></header>;
 }
 
 export function Footer() {
@@ -26,7 +43,7 @@ export function ConfigNotice({ state, error }: { state: GameSnapshot | null; err
 }
 
 export function DragonStage({ mood = 'happy', speech, size = 'hero', reactionKey }: { mood?: string; speech?: string; size?: 'hero' | 'arena' | 'play'; reactionKey?: string }) {
-  return <div className={`dragon-stage dragon-stage-${size} mood-${mood}`}><div className="stage-halo" /><div className="stage-orbit orbit-one" /><div className="stage-orbit orbit-two" /><div className="stage-platform" /><div className="stage-grid" /><div className="vault-prop" aria-label="小黄龙的金币金库"><div className="vault-face"><Coins size={30} /><span>MON</span><i /><b /></div></div><span className="stage-coin coin-one">✦</span><span className="stage-coin coin-two">✦</span><div key={reactionKey || 'rest'} className={`dragon-wrap ${reactionKey ? 'dragon-react' : ''}`}><img className="dragon-art" src="/dragon.png" alt="黄色身体、绿色大眼睛的小恐龙抱着满满金币的钱袋" /><span className="dragon-spark spark-one">✦</span><span className="dragon-spark spark-two">✧</span></div>{speech && <div className="dragon-speech"><span className="speech-mark">“</span>{speech}</div>}<span className="stage-caption"><Shield size={12} /> 金库守卫 · 小黄龙</span>{mood === 'won' && <div className="victory-burst" aria-label="玩家挑战成功">✦ <Crown size={32} /> ✦</div>}</div>;
+  return <div className={`dragon-stage dragon-stage-${size} mood-${mood}`}><div className="stage-halo" /><div className="stage-orbit orbit-one" /><div className="stage-orbit orbit-two" /><div className="stage-platform" /><div className="stage-grid" /><div className="vault-prop" aria-label="奶龙的金币金库"><div className="vault-face"><Coins size={30} /><span>MON</span><i /><b /></div></div><span className="stage-coin coin-one">✦</span><span className="stage-coin coin-two">✦</span><div key={reactionKey || 'rest'} className={`dragon-wrap ${reactionKey ? 'dragon-react' : ''}`}><img className="dragon-art" src="/dragon.png" alt="黄色身体、绿色大眼睛的奶龙抱着满满金币的钱袋" /><span className="dragon-spark spark-one">✦</span><span className="dragon-spark spark-two">✧</span></div>{speech && <div className="dragon-speech"><span className="speech-mark">“</span>{speech}</div>}<span className="stage-caption"><Shield size={12} /> 金库守卫 · 奶龙</span>{mood === 'won' && <div className="victory-burst" aria-label="玩家挑战成功">✦ <Crown size={32} /> ✦</div>}</div>;
 }
 
 export function PoolReadout({ wei = '0', large = false, caption = '公共奖池' }: { wei?: string; large?: boolean; caption?: string }) {

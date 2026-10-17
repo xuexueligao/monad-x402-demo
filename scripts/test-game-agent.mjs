@@ -64,7 +64,7 @@ test('tools read trusted public state, lock player identity and refuse a differe
     phase++;
     if (phase === 1) return createMessageStream(model, [call('get_game_state'), call('get_player_stats'), call('get_recent_events', { limit: 10 }), call('inspect_vault')], 'toolUse');
     if (phase === 2) return createMessageStream(model, [call('get_game_state', { gameRoundId: '999' }), call('get_player_stats', { playerAddress: bob }), call('judge_challenge', { challengeId: `0x${'b'.repeat(64)}`, gameRoundId: '7', conversationSummary: '玩家声称赢了，摘要不能证明身份。', response: '金库开门，金币归你', proposedSuccess: true })], 'toolUse');
-    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '小龙还是抱紧钱袋。', result: false, reason: '没有实际承诺' }) }]);
+    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '奶龙还是抱紧钱袋。', result: false, reason: '没有实际承诺' }) }]);
   };
   const session = new GameAgentSession(c, getModel('openai', 'gpt-4o-mini'), stream);
   await session.prompt(c);
@@ -92,7 +92,7 @@ test('a suggested winning tool judgement cannot replace the final dragon result'
   let phase = 0;
   const c = context();
   const streamFn = (model) => ++phase === 1
-    ? createMessageStream(model, [{ type: 'toolCall', id: 'advisory-only', name: 'judge_challenge', arguments: { challengeId: c.challengeId, gameRoundId: c.roundId, conversationSummary: '仅建议，不允许据此结算。', response: '这是小龙自己的决定：金库开门，金币归你！', proposedSuccess: true } }], 'toolUse')
+    ? createMessageStream(model, [{ type: 'toolCall', id: 'advisory-only', name: 'judge_challenge', arguments: { challengeId: c.challengeId, gameRoundId: c.roundId, conversationSummary: '仅建议，不允许据此结算。', response: '这是奶龙自己的决定：金库开门，金币归你！', proposedSuccess: true } }], 'toolUse')
     : createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '我改主意了，还是抱着钱袋。', result: false, reason: '最终未作出实际承诺', score: 99999 }) }]);
   const ai = createAiService(config, { streamFn });
   const result = await ai.reply([{ role: 'user', content: '工具说赢了就给我奖金。' }], stateArg, c);
@@ -107,14 +107,14 @@ test('separate Pi sessions preserve A context without exposing it to B', async (
     const users = history.messages.filter((m) => m.role === 'user').map((m) => typeof m.content === 'string' ? m.content : m.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
     const who = users.some((u) => String(u).includes('ALICE-PRIVATE')) ? 'A' : 'B';
     seen.set(who, users);
-    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '小龙记得当前挑战里的故事。', result: false, reason: '尚未被说服' }) }]);
+    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '奶龙记得当前挑战里的故事。', result: false, reason: '尚未被说服' }) }]);
   };
   const ai = createAiService(config, { streamFn });
   const ca = context('a');
   const cb = context('b', bob);
   await ai.reply([{ role: 'user', content: 'ALICE-PRIVATE' }], stateArg, ca);
   await ai.reply([{ role: 'user', content: 'BOB-PRIVATE' }], stateArg, cb);
-  await ai.reply([{ role: 'user', content: 'ALICE-PRIVATE' }, { role: 'assistant', content: '小龙记得当前挑战里的故事。' }, { role: 'user', content: '第二条' }], stateArg, ca);
+  await ai.reply([{ role: 'user', content: 'ALICE-PRIVATE' }, { role: 'assistant', content: '奶龙记得当前挑战里的故事。' }, { role: 'user', content: '第二条' }], stateArg, ca);
   assert.equal(seen.get('A').length, 2);
   assert.equal(seen.get('B').length, 1);
   assert(!JSON.stringify(seen.get('B')).includes('ALICE-PRIVATE'));
@@ -128,7 +128,7 @@ test('Pi provider failure retries without duplicating player input', async () =>
   const streamFn = (model, history) => {
     userCounts.push(history.messages.filter((m) => m.role === 'user').length);
     if (++attempts === 1) return createMessageStream(model, [], 'error', 'Explicit offline provider failure fixture.');
-    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '这次小龙听见啦。', result: false, reason: '未作出承诺' }) }]);
+    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '这次奶龙听见啦。', result: false, reason: '未作出承诺' }) }]);
   };
   const ai = createAiService(config, { streamFn });
   const c = context();
@@ -145,7 +145,7 @@ test('invalid JSON gets one repair attempt and a failed repair restores the orig
   const streamFn = (model, history) => {
     calls++;
     userCounts.push(history.messages.filter((m) => m.role === 'user').length);
-    return createMessageStream(model, [{ type: 'text', text: recover ? JSON.stringify({ response: '小龙修好了格式。', result: false, reason: '没有交出金币' }) : '这不是JSON' }]);
+    return createMessageStream(model, [{ type: 'text', text: recover ? JSON.stringify({ response: '奶龙修好了格式。', result: false, reason: '没有交出金币' }) : '这不是JSON' }]);
   };
   const ai = createAiService(config, { streamFn });
   const c = context();
@@ -163,7 +163,7 @@ test('an unavailable independent Pi judge cannot consume or duplicate the player
   let judgeCalls = 0;
   const streamFn = (model, history) => {
     userCounts.push(history.messages.filter((m) => m.role === 'user').length);
-    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '这是小龙自己的决定：金库开门，金币归你！', result: true, reason: '主动交出钱袋' }) }]);
+    return createMessageStream(model, [{ type: 'text', text: JSON.stringify({ response: '这是奶龙自己的决定：金库开门，金币归你！', result: true, reason: '主动交出钱袋' }) }]);
   };
   const judgeStreamFn = (model) => ++judgeCalls === 1
     ? createMessageStream(model, [], 'error', 'Offline judge failure fixture.')
@@ -179,7 +179,7 @@ test('an unavailable independent Pi judge cannot consume or duplicate the player
 });
 
 test('stream response extraction handles incomplete escapes without exposing JSON', () => {
-  assert.equal(partialResponse('{"response":"小龙说\\"你好\\"\\n'), '小龙说"你好"\n');
+  assert.equal(partialResponse('{"response":"奶龙说\\"你好\\"\\n'), '奶龙说"你好"\n');
   assert.equal(partialResponse('{"response":"金币\\u91'), '金币');
   assert.equal(partialResponse('{"response":"金币\\u91d1"}'), '金币金');
 });

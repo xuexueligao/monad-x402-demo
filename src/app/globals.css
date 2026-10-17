@@ -41,6 +41,11 @@
 
 .dragon-stage .stage-halo{left:0;right:0}
 
+.brand{gap:11px}.brand-wordmark{display:flex;align-items:baseline;gap:6px;font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:-.4px;white-space:nowrap;color:#fbf8ff;line-height:1.2}.brand-wordmark>span{color:#ffe69b}.brand .brand-symbol{height:28px;width:28px;border-width:6px;border-radius:9px;flex:none}.site-header .wallet-compact>.button-gold{background:linear-gradient(180deg,#a76eff,#7335de);border-color:#cfaaff;color:#fff;box-shadow:inset 0 0 12px #e8c8ff20,0 0 15px #8c4eff33}.site-header .wallet-compact>.button-gold:hover:not(:disabled){background:linear-gradient(180deg,#b282ff,#8648e9)}
+@media(max-width:1030px){.brand-wordmark{font-size:16px;gap:5px}.brand .brand-symbol{height:25px;width:25px;border-width:6px;border-radius:8px}.brand{gap:9px}}
+@media(max-width:600px){.brand-wordmark{font-size:14px;gap:4px;letter-spacing:-.35px}.brand .brand-symbol{height:21px;width:21px;border-width:5px;border-radius:7px}.brand{gap:8px}.site-header:not(.site-header-home){display:grid;grid-template-columns:1fr auto;height:88px;row-gap:0;align-content:center}.site-header:not(.site-header-home) .header-actions{grid-column:2;grid-row:1}.site-header:not(.site-header-home) .main-nav{grid-column:1/-1;grid-row:2;justify-content:flex-start;gap:24px;height:26px;margin:4px 0 0;padding-left:29px;font-size:9px}.site-header:not(.site-header-home) .main-nav a{height:26px}.site-header:not(.site-header-home) .main-nav .active:after{bottom:0}.arena-shell .site-header:not(.site-header-home){height:84px}.arena-shell .main-nav{gap:24px}}
+@media(max-width:370px){.brand-wordmark{font-size:12px;gap:4px}.brand{gap:7px}.brand .brand-symbol{height:20px;width:20px}}
+
 /* Wallet entry lives above the game HUD, with one clear path back into the arena. */
 .wallet-dialog-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:#090512c9;backdrop-filter:blur(8px)}
 .wallet-dialog{position:relative;width:min(100%,520px);max-height:calc(100dvh - 48px);overflow-y:auto;background:#20142f;border:1px solid #a997ef32;border-radius:21px;padding:30px;box-shadow:0 28px 100px #0008;scrollbar-width:thin;scrollbar-color:#6e4d80 transparent;overscroll-behavior:contain}

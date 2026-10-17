@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 const backendPath = (url = '/') => /^\/(?:api\/(?:game|challenges|transactions)(?:\/|\?|$)|api\/health(?:\?|$)|health(?:\?|$)|socket\.io(?:\/|\?|$))/.test(url);
 
-export function startGateway({ port = Number(process.env.ARENA_GATEWAY_PORT || process.env.PORT || 4100), host = '0.0.0.0', frontendPort = 3150, backendPort = 4000 } = {}) {
+export function startGateway({ port = Number(process.env.ARENA_GATEWAY_PORT || process.env.PORT || 4100), host = '0.0.0.0', frontendPort = 3150, backendPort = Number(process.env.ARENA_BACKEND_PORT || 4000) } = {}) {
   const connections = new Set();
   const track = (socket) => {
     if (!connections.has(socket)) { connections.add(socket); socket.once('close', () => connections.delete(socket)); }

@@ -170,7 +170,7 @@ export class ArenaGame {
       if (!record.enteredAt || getAddress(record.player) !== getAddress(session.player) || record.roundId !== session.roundId || record.fee !== session.fee) throw new ApiError(400, 'Confirmed payment is not bound to this player and challenge.');
       session.paymentHash = hash; session.paidAt = record.enteredAt * 1000; session.expiresAt = record.expiresAt * 1000;
       session.status = 'active';
-      session.messages = [{ role: 'assistant', content: '入场费已进入链上金库！小龙的钱袋鼓鼓的，你最多有三次机会，让我自愿交出金币吧。🐉' }];
+      session.messages = [{ role: 'assistant', content: '入场费已进入链上金库！奶龙的钱袋鼓鼓的，你最多有三次机会，让我自愿交出金币吧。🐉' }];
       this.persist();
       this.publish('challenge:started', { challengeId: session.id, player: session.player, paymentHash: hash, fee: session.fee, maxMessages: session.maxMessages, expiresAt: session.expiresAt, aiMode: this.ai.mode }, session.roundId);
       if (this.now() >= session.expiresAt) await this.resolveAndSettle(session);
@@ -192,7 +192,7 @@ export class ArenaGame {
           challengeId: session.id, player: session.player, roundId: session.roundId, state: this.snapshot(),
           onEvent: (event) => { for (const sink of this.privateSinks) sink(session.id, event); },
         });
-      } catch { throw new ApiError(502, '小龙的思路打了个结。AI 暂时不可用，请重试，或结束本场；这条消息没有计入次数，也不会再次收费。'); }
+      } catch { throw new ApiError(502, '奶龙的思路打了个结。AI 暂时不可用，请重试，或结束本场；这条消息没有计入次数，也不会再次收费。'); }
       if (this.now() >= session.expiresAt) {
         await this.resolveAndSettle(session);
         return structuredClone(session);
@@ -200,7 +200,7 @@ export class ArenaGame {
       session.messages.push({ role: 'user', content }, { role: 'assistant', content: answer.response });
       session.result = { ...answer, score: answer.result ? GAME_RULES.successScore : GAME_RULES.failureScore };
       this.persist();
-      this.publish('challenge:message', { challengeId: session.id, player: session.player, messageNumber: count + 1, summary: answer.result ? '小龙松开了钱袋，后台正在结算。' : '玩家提出了新计策，小龙仍在守护金币。' }, session.roundId);
+      this.publish('challenge:message', { challengeId: session.id, player: session.player, messageNumber: count + 1, summary: answer.result ? '奶龙松开了钱袋，后台正在结算。' : '玩家提出了新计策，奶龙仍在守护金币。' }, session.roundId);
       if (answer.result || count + 1 === session.maxMessages) await this.resolveAndSettle(session);
       return structuredClone(session);
     });
@@ -230,9 +230,9 @@ export class ArenaGame {
         transcriptHash: keccak256(stringToHex(JSON.stringify(session.messages))),
       };
       const signature = await this.account!.signTypedData({ domain: { ...RESULT_DOMAIN, chainId: this.chain.chainId, verifyingContract: this.chain.contractAddress! }, types: RESULT_TYPES, primaryType: 'ChallengeResult', message: { ...result, roundId: BigInt(result.roundId), score: BigInt(result.score), deadline: BigInt(result.deadline) } });
-      session.result = { response: session.result?.response, result: success, reason: session.result?.reason || '挑战已结束，小龙尚未主动承诺交出钱袋。', score: Number(result.score) };
+      session.result = { response: session.result?.response, result: success, reason: session.result?.reason || '挑战已结束，奶龙尚未主动承诺交出钱袋。', score: Number(result.score) };
       session.status = 'resolved'; session.attestation = { result, signature }; this.persist();
-      this.publish('challenge:resolved', { challengeId: session.id, player: session.player, success, score: result.score, reason: success ? '小黄龙主动交出钱袋，自动结算中。' : '未达到公开胜利条件，自动记录结果。', aiMode: this.ai.mode }, session.roundId);
+      this.publish('challenge:resolved', { challengeId: session.id, player: session.player, success, score: result.score, reason: success ? '奶龙主动交出钱袋，自动结算中。' : '未达到公开胜利条件，自动记录结果。', aiMode: this.ai.mode }, session.roundId);
     } else if (!session.settlementHash && Number(session.attestation.result.deadline) <= Math.floor(this.now() / 1000) + 15) {
       // Renew only the expiry of an immutable judgement. Never ask AI again after resolution.
       const result = { ...session.attestation.result, deadline: String(Math.floor(this.now() / 1000) + GAME_RULES.signatureDurationSeconds) };

@@ -47,7 +47,7 @@ export function useAgentStream(session: ChallengeSession | null, thinking: boole
       if (event.type === 'text_delta' && typeof event.delta === 'string') {
         setText(previous => previous + event.delta);
       } else if (event.type === 'tool_start') {
-        setToolStatus(toolLabels[event.toolName || ''] || '小黄龙正在查看金库记录');
+        setToolStatus(toolLabels[event.toolName || ''] || '奶龙正在查看金库记录');
       } else if (event.type === 'tool_end') {
         setToolStatus(null);
       }

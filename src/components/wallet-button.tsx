@@ -52,7 +52,7 @@ function WalletConnectionDialog({ wallets, walletConnect, checking, busy, error,
   return createPortal(<div className="wallet-dialog-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="wallet-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} ref={panel}>
       <button className="wallet-dialog-close icon-button" type="button" aria-label="关闭钱包连接" onClick={onClose}><X size={20} /></button>
-      <div className="wallet-dialog-heading"><span className="wallet-dragon"><img src="/dragon.png" alt="" /></span><div><h2 id={titleId}>连接你的钱包</h2><p id={descriptionId}>{wallets.length ? '选择已安装的钱包，进入小黄龙的竞技场。' : '用手机钱包打开游戏，或安装浏览器钱包。'}</p></div></div>
+      <div className="wallet-dialog-heading"><span className="wallet-dragon"><img src="/dragon.png" alt="" /></span><div><h2 id={titleId}>连接你的钱包</h2><p id={descriptionId}>{wallets.length ? '选择已安装的钱包，进入奶龙的竞技场。' : '用手机钱包打开游戏，或安装浏览器钱包。'}</p></div></div>
       <div className="wallet-dialog-network"><span className="mint-dot" />Monad Testnet<span>连接后查看你自己的余额</span></div>
       {wallets.length > 0 && <div className="wallet-installed-list">{wallets.map(connector => <button type="button" key={connector.uid} disabled={busy} onClick={() => onConnect(connector)}><span className="wallet-choice-icon"><Wallet size={19} /></span><span><strong>{walletDisplayName(connector)}</strong><small>已检测到 · 连接并切换测试网</small></span><ArrowUpRight size={17} /></button>)}</div>}
       {walletConnect && <button type="button" className="wallet-connect-option" disabled={busy} onClick={() => onConnect(walletConnect)}><Smartphone size={19} /><span><strong>WalletConnect</strong><small>扫描连接二维码，使用手机钱包</small></span><ArrowUpRight size={17} /></button>}
@@ -67,7 +67,7 @@ function WalletConnectionDialog({ wallets, walletConnect, checking, busy, error,
   </div>, document.body);
 }
 
-export function WalletButton({ className = '', compact = false }: { className?: string; compact?: boolean }) {
+export function WalletButton({ className = '', compact = false, label }: { className?: string; compact?: boolean; label?: string }) {
   const { address, isConnected, chainId } = useAccount();
   const { connectAsync, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
@@ -148,7 +148,7 @@ export function WalletButton({ className = '', compact = false }: { className?: 
   </div>;
 
   return <div className={`wallet-control ${compact ? 'wallet-compact' : ''}`}>
-    <button className={`button button-gold ${className}`} disabled={checking || isPending} onClick={() => void scanWallets(true)}><Wallet size={18} />{checking ? '检测钱包…' : isPending ? '连接中…' : compact ? '连接钱包' : '连接 Monad Testnet 钱包'}</button>
+    <button className={`button button-gold ${className}`} disabled={checking || isPending} onClick={() => void scanWallets(true)}><Wallet size={18} />{checking ? '检测钱包…' : isPending ? '连接中…' : label || (compact ? '连接钱包' : '连接 Monad Testnet 钱包')}</button>
     {dialogOpen && <WalletConnectionDialog wallets={installed} walletConnect={walletConnectConnector} checking={checking} busy={isPending} error={error} onClose={closeDialog} onRefresh={() => void scanWallets(false)} onConnect={connector => void connectWallet(connector)} />}
     {error && !dialogOpen && <p className="wallet-error" role="alert">{error}</p>}
   </div>;

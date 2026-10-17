@@ -1,0 +1,12 @@
+{
+  "asset": "public/throne-hall-bg.webp",
+  "tool": "Built-in image_gen",
+  "reference": "User-provided codex-clipboard-6571b3ca-bb01-4c40-ae9d-ddc64cd364cb.png",
+  "character": "Existing public/dragon.png, unchanged",
+  "prompt": "Use case: stylized-concept. Asset type: 16:9 background environment for the MONAD RUG ARENA interactive web game, no UI baked into the image. Reference input: attached reference image is a STYLE AND ENVIRONMENT reference only. Recreate its cinematic high quality 3D medieval treasure throne chamber: rough charcoal stone arches, tall deep crimson torn heraldic banners with a simple dark flame emblem, warm orange torch fire on both sides, bright piles of detailed gold coins and small treasure chests around a broad red stone stage in the lower center. A dark crown relief high above the stage. Dark audience silhouettes cropped along only the bottom 8 percent, leave main stage unobstructed for the existing character PNG. Camera front-on, symmetrical wide composition, vaulted chamber visible all the way across. Keep central arch and left/right content areas dark enough for real HTML interface text and parchment chat panels to overlay. Rich warm rim lights and atmospheric depth matching the reference, not flat watercolor, not purple, not green. No character, no mascot, no creature, no people standing in the stage. No text, no letters, no numbers, no UI, no panels, no navigation, no logo, no watermark. Do not render the example UI or the dragon: those are separate unchanged assets in code.",
+  "format": "WebP",
+  "dimensions": [
+    1672,
+    941
+  ]
+}

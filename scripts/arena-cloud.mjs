@@ -22,6 +22,7 @@ copyAssets(path.join(root, 'public'), path.join(standalone, 'public'));
 copyAssets(path.join(root, '.next', 'static'), path.join(standalone, '.next', 'static'));
 
 const publicPort = process.env.ARENA_GATEWAY_PORT || process.env.PORT || '4100';
+const backendPort = process.env.ARENA_BACKEND_PORT || '4000';
 const env = { ...process.env, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1' };
 const publicUrl = env.RENDER_EXTERNAL_URL || env.FRONTEND_URL;
 if (publicUrl) {
@@ -45,7 +46,7 @@ function launch(args, overrides) {
   child.once('error', () => { console.error('An Arena child service could not start.'); stop(1); });
   child.once('exit', (code, signal) => { if (!stopping) { console.error(`An Arena child service stopped (${signal || code || 0}).`); stop(code || 1); } });
 }
-launch(['--import', 'tsx', 'server/index.ts'], { API_HOST: '127.0.0.1', API_PORT: '4000', PORT: '4000' });
+launch(['--import', 'tsx', 'server/index.ts'], { API_HOST: '127.0.0.1', API_PORT: backendPort, PORT: backendPort });
 launch([path.join(standalone, 'server.js')], { HOSTNAME: '127.0.0.1', PORT: '3150' });
 launch(['scripts/arena-gateway.mjs'], { ARENA_GATEWAY_PORT: publicPort, PORT: publicPort });
 process.once('SIGINT', () => stop());

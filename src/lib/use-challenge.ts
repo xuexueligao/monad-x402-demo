@@ -280,6 +280,7 @@ export function useChallenge() {
   const reset = () => {
     if (busy.current || roundHash || (session && session.paidAt && phase !== 'confirmed') || paymentHash && !['confirmed', 'payment_failed'].includes(phase)) return;
     operation.current += 1; confirmedId.current = null;
+    cache(storageKey, {});
     setSession(null); setPaymentHash(null); setPhase('idle'); setError(null); setActualReward('0'); setConfirmedSuccess(false);
   };
   const visible = hydratedKey === storageKey;
