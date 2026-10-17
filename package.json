@@ -25,7 +25,8 @@
     "check:server": "tsc --noEmit -p server/tsconfig.json",
     "deploy:arena": "node scripts/arena-node.mjs --env-file-if-exists=.env.arena.local contracts/scripts/deploy-arena.mjs",
     "verify:arena-browser": "node scripts/arena-node.mjs scripts/verify-arena-browser.mjs",
-    "test:agent": "node scripts/arena-node.mjs --import tsx --test scripts/test-game-agent.mjs"
+    "test:agent": "node scripts/arena-node.mjs --import tsx --test scripts/test-game-agent.mjs",
+    "test:wallet": "node scripts/arena-node.mjs --import tsx --test scripts/test-wallet-connection.mjs"
   },
   "dependencies": {
     "@fastify/cors": "11.3.1",

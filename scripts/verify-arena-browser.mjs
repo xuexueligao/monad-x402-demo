@@ -25,10 +25,17 @@ try {
   }
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: '连接 Monad Testnet 钱包', exact: true }).click();
-  const walletAlert = page.getByRole('alert').filter({ hasText: /钱包|MetaMask|Rabby/ });
-  await walletAlert.waitFor();
-  assert.match(await walletAlert.innerText(), /钱包|MetaMask|Rabby/);
-  checks.push('Missing wallet shows recoverable guidance');
+  const walletDialog = page.getByRole('dialog');
+  await walletDialog.waitFor();
+  assert.match(await walletDialog.innerText(), /MetaMask/);
+  assert.equal(await walletDialog.locator('a[href^="https://metamask.app.link/dapp/"]').count(), 1);
+  assert.equal(await walletDialog.locator('a[href^="https://link.trustwallet.com/open_url"]').count(), 1);
+  assert.equal(await walletDialog.getByText('WalletConnect', { exact: true }).count(), 0, 'An unconfigured connector is not offered');
+  assert.equal(await walletDialog.locator('svg').count() > 0, true);
+  await page.screenshot({ path: `${directory}/arena-wallet-options.png`, fullPage: true });
+  await page.keyboard.press('Escape');
+  await walletDialog.waitFor({ state: 'hidden' });
+  checks.push('Missing wallet opens actionable app links and a mobile QR, with no unavailable WalletConnect option');
   await page.close();
 
   // A test-only EIP-1193 connection provider. No key, transaction, or chain receipt is fabricated.
@@ -62,14 +69,12 @@ try {
   await wallet.goto(base, { waitUntil: 'networkidle' });
   await wallet.getByRole('button', { name: '连接 Monad Testnet 钱包', exact: true }).click();
   await wallet.waitForURL('**/play');
-  const switchButton = wallet.getByRole('button', { name: '切换 Monad Testnet', exact: true });
-  await switchButton.waitFor();
-  await switchButton.click();
-  await switchButton.waitFor({ state: 'hidden' });
+  await wallet.getByRole('button', { name: /0x2000/ }).first().waitFor();
+  assert.equal(await wallet.getByRole('button', { name: '切换 Monad Testnet', exact: true }).count(), 0);
   const methods = await wallet.evaluate(() => window.__arenaWalletMethods);
   assert(methods.includes('wallet_switchEthereumChain'));
   assert(!methods.some(method => /sendTransaction|signTypedData|personal_sign/.test(method)));
-  checks.push('Injected wallet connects, opens /play, switches only to Monad Testnet; no chat/entry transaction is requested');
+  checks.push('One detected wallet connects, automatically switches only to Monad Testnet and opens /play; no payment is requested by connection');
   await wallet.screenshot({ path: `${directory}/arena-wallet-connected.png`, fullPage: true });
   await wallet.close();
   assert.deepEqual(errors, [], 'Browser runtime errors');
