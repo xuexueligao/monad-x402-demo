@@ -9,7 +9,7 @@
 | 后端与 Pi Agent | 20 / 20，通过；实际订阅工具执行事件并观察到全部五个工具，另含两项 100 块分页回归 |
 | 类型检查 | 前端及 server + Pi 模块严格 TypeScript 检查通过 |
 | 生产构建 | Next.js 16.4.2 构建通过，5 个游戏路由均已生成 |
-| 生产运行 | standalone 前端 3150 + Fastify 后端 4000 可启动 |
+| 生产运行 | `npm run start:cloud` 单启动器运行 standalone 前端 3150、Fastify 后端 4000 与同域网关 4100；公网支持真实 WebSocket |
 | 桌面与手机浏览器 | Edge 隔离实例，五路由 1600px / 390px 无横向溢出，无页面运行时错误 |
 | 钱包 UI | 连接测试提供者后自动进入 /play，错误网络提示切换至 10143，无逐条聊天交易 |
 | 无钱包体验 | 可恢复提示，按钮可重试 |
@@ -21,9 +21,10 @@
 | Monad RPC | 官方配置核对，实际 eth_chainId 返回 0x279f；从真实部署区块补扫成功，每批最多 100 块 |
 | 测试网部署 | 已部署 RugArena，区块 71762027，部署回执 success；实际运行时代码与编译产物完全一致 |
 | 测试网游戏结算 | 真实 10 MON 失败挑战结算成功，区块 71764191，pool 8 MON / 合约余额 10 MON / 玩家 10 分；Pi 本地规则模式，尚无真实领奖 |
-| 真实远程模型 | 未验证；当前未配置 AI_API_KEY，清楚标注 local-rules，仍经过实际 Pi Runtime 工具执行 |
-| 临时公网 | 五个路由返回 200、健康检查 ready、真实部署交易 API、WebSocket-only 快照验证通过；依赖本机与隧道持续运行 |
-| 固定托管与 Docker | Render 单服务 Blueprint 与同域网关已准备，尚待托管账户登录；未宣称实测容器 |
+| 真实远程模型 | APIPod `https://api.apipod.ai/v1` / `deepseek-flash` 已配置并实际调用 Pi SDK；Alice 两轮 / Bob 一轮上下文隔离，五个游戏工具均实际执行，结构化结果与生产默认流式配置通过 |
+| 公网真实 AI 与签名 | HTTPS 两轮聊天产生 26 个私有 `text_delta`，文本先于 HTTP 完成到达；公域观察者未收到私有流；`finish` EIP-712 恢复地址匹配链上 signer，固定积分和挑战/玩家/回合/域绑定检查通过 |
+| 临时公网 | 五个路由返回 200、健康检查 ready / aiMode live、真实部署交易 API、WebSocket-only 快照验证通过；依赖本机与隧道持续运行 |
+| 固定托管与 Docker | Render 单服务 Blueprint、APIPod 公开模型配置与同域网关已准备，账户验证尚未完成，未完成固定云托管；未宣称实测容器 |
 
 浏览器验证脚本包含 7 组检查。测试提供者只模拟连接和网络切换，不制造交易或链上确认。链上交易与余额另由真实本地 EVM 实测，明确不当作 Monad Testnet 交易。
 
@@ -34,6 +35,8 @@
 - `.local/evidence/arena-testnet-deployment.json`：真实 Monad Testnet 回执、运行时代码匹配与合约参数读回。
 - `.local/evidence/arena-testnet-settlement.json`：实际结算回执与后端验签、链上统计和实时确认检查。
 - `.local/evidence/arena-public-deployment.json`：临时 HTTPS 五页面、真实交易详情及 WebSocket 检查。
+- `.local/evidence/ai-live-check.safe.json`：脱敏的 APIPod 真实调用、Pi 五工具、Alice 两轮 / Bob 一轮隔离、结构化结果与生产默认流式验收；不包含 API Key 或私聊文本。
+- `.local/evidence/arena-live-production-http.json`：公网生产 HTTP 与私有 Socket.IO 文本流、两轮上下文、26 个文本增量及 EIP-712 签名验证；公域没有泄露私有流或 token。
 - `.local/evidence/arena-e2e.json`：合约、两钱包、实际回执与奖励余额。
 - `.local/evidence/arena-browser.json`：浏览器检查和运行时错误列表。
 - `.local/evidence/arena-*-desktop.png` / `arena-*-mobile.png`：五页面真实截图。
@@ -43,4 +46,6 @@
 
 2026-10-17 15:33（Asia/Shanghai）读回公共回合 1 仍为 active，预计 17:30:16 到期；这是一份检查时快照，当前状态应从链上读取。到期或产生赢家后，玩家可通过游戏页面开启新公共回合。
 
-执行命令与 `render.yaml` 单服务部署、`npm run start:cloud` 同域网关及临时 HTTPS 隧道说明参见根 README。模型 Key 与托管变量仅注入服务端，私钥不进入文档、浏览器构建或 Git 仓库。公网地址和 live AI 状态应在成功核验后单独记录。
+2026-10-17 15:47–15:51（Asia/Shanghai）完成 APIPod 真实模型与公网生产 Agent 验收。公网回复通过真正的 Pi Agent Runtime 工具执行和私有事件流返回，后端签名恢复地址为 `0x5C821ed0eE711B1644Bf27b36B90b4514ef50F8a`，与合约 `resultSigner` 一致。此次验收提交链上交易数为 0，没有支付或领奖；前后奖池均为 8 MON，累计已结算挑战均为 1。前述区块 71764191 的收费结算仍是 Pi 本地规则模式的独立证据，不能将其改写为远程模型结果结算。
+
+执行命令与 `render.yaml` 单服务部署、`npm run start:cloud` 同域网关及临时 HTTPS 隧道说明参见根 README。Render 服务端秘密变量为 `AI_API_KEY` 与 `ARENA_RESULT_SIGNER_PRIVATE_KEY`，公开模型配置为 `AI_BASE_URL=https://api.apipod.ai/v1`、`AI_MODEL=deepseek-flash`。模型 Key 与托管变量仅注入服务端，私钥不进入文档、浏览器构建或 Git 仓库。固定 Render 服务尚未部署完成，已验收公网入口仍为依赖本机运行的临时 HTTPS 隧道。

@@ -23,12 +23,12 @@ services:
         value: "71762027"
       - key: ARENA_RESULT_SIGNER_PRIVATE_KEY
         sync: false
-      - key: OPENAI_API_KEY
+      - key: AI_API_KEY
         sync: false
       - key: AI_BASE_URL
-        value: https://api.openai.com/v1
+        value: https://api.apipod.ai/v1
       - key: AI_MODEL
-        value: gpt-4o-mini
+        value: deepseek-flash
       - key: ARENA_CHALLENGE_FEE_MON
         value: "10"
       - key: ARENA_POOL_SHARE_BPS

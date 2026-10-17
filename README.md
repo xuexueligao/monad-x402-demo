@@ -10,9 +10,9 @@
 
 Next.js 入口、聊天、大屏、排行榜、真实交易详情；Fastify + Socket.IO 会话与实时广播；实际 Pi Agent Runtime 工具调用；单一 `RugArena.sol` 验签、结算、奖池、统计与领奖；测试、部署脚本与 Docker 配置均在实际工程内。
 
-**RugArena 已部署到 Monad Testnet，临时 HTTPS 公网入口已验证，真实模型等待本机 Key。** 公开部署清单见 [monad-testnet.json](deployments/monad-testnet.json)。旧 x402 付款和本地链测试均不能代替本游戏的测试网结算证据。
+**RugArena 已部署到 Monad Testnet，临时 HTTPS 公网入口与真实 AI 多轮对话、私有流式回复均已验证。** 当前模型通过 APIPod 的 `deepseek-flash` 接入实际 Pi Agent Runtime。公开部署清单见 [monad-testnet.json](deployments/monad-testnet.json)。旧 x402 付款和本地链测试均不能代替本游戏的测试网结算证据。
 
-临时演示：[玩家入口](https://dresses-brad-saints-cap.trycloudflare.com/play) · [现场大屏](https://dresses-brad-saints-cap.trycloudflare.com/arena)。2026-10-17 已验证五个页面返回 200、健康检查 `ready`、真实部署交易详情及 WebSocket 快照。该地址依赖本机服务和隧道进程持续运行；固定 Render 托管尚待账户登录，不能将临时地址当作已完成云托管。
+临时演示：[玩家入口](https://dresses-brad-saints-cap.trycloudflare.com/play) · [现场大屏](https://dresses-brad-saints-cap.trycloudflare.com/arena)。2026-10-17 已验证五个页面返回 200、健康检查 `ready`、真实部署交易详情、WebSocket 快照及 `aiMode: live` 的两轮聊天。该地址依赖本机服务和隧道进程持续运行；固定 Render 托管尚未完成账户验证，不能将临时地址当作已完成云托管。
 
 | 部署信息 | 实际链上记录 |
 | --- | --- |
@@ -23,7 +23,7 @@ Next.js 入口、聊天、大屏、排行榜、真实交易详情；Fastify + So
 | 实际参数 | 每次结算 **10 测试 MON**；80% 入池；胜利领取当前奖池 50%；回合 7200 秒 |
 | 奖池快照 | 实测结算后 8 测试 MON，合约实际余额 10 MON；当前值从链上读取 |
 
-真实结算验收使用 **Pi 本地规则模式**，实际执行五个游戏工具、后端验签和支付；两个实时客户端均收到链上确认，重复挑战被 `ChallengeAlreadySettled` 拒绝。它不代表已验证远程 AI。见 [测试网结算证据](deployments/monad-testnet-smoke.json)。
+真实结算验收使用 **Pi 本地规则模式**，实际执行五个游戏工具、后端验签和支付；两个实时客户端均收到链上确认，重复挑战被 `ChallengeAlreadySettled` 拒绝。见 [测试网结算证据](deployments/monad-testnet-smoke.json)。后续远程 AI 单独完成真实 Pi 工具调用、两玩家上下文隔离、HTTPS 私有文本流及 EIP-712 签名验证；该次 AI 验收没有提交新交易，奖池仍为 8 MON、已结算挑战仍为 1。
 
 实测结果：合约 **54/54**、后端与 Pi **20/20**、双钱包真实本地链端到端通过、生产构建通过、浏览器 **7 组**检查通过。后端包含 Monad 公共 RPC 每批最多 100 块的日志扫描回归测试。详细记录见 [验收记录](docs/arena-verification.md)。
 
@@ -142,11 +142,11 @@ ARENA_CONTRACT_ADDRESS=0xc998eb98453f4c26Aba98D369E8C3895b8061085
 NEXT_PUBLIC_ARENA_CONTRACT_ADDRESS=0xc998eb98453f4c26Aba98D369E8C3895b8061085
 ARENA_DEPLOYMENT_BLOCK=71762027
 AI_API_KEY=你的模型Key
-AI_BASE_URL=https://api.openai.com/v1
-AI_MODEL=gpt-4o-mini
+AI_BASE_URL=https://api.apipod.ai/v1
+AI_MODEL=deepseek-flash
 ```
 
-Key 只由 Fastify 读取，不能使用 `NEXT_PUBLIC_` 前缀。真实 AI 由 Pi 的模型提供方调用，官方 OpenAI 使用 JSON Schema 输出，兼容供应商使用 JSON 解析和最多一次格式修复；成功候选另做独立裁判检查，参考 [OpenAI 官方结构化输出文档](https://developers.openai.com/api/docs/guides/structured-outputs)。兼容供应商修改 BASE_URL/MODEL 即可。
+Key 只由 Fastify 读取，不能使用 `NEXT_PUBLIC_` 前缀。本机现已配置并验证 APIPod 的 OpenAI 兼容接口，`AI_API_KEY` 仅保存在受忽略的本机配置中。真实 AI 由 Pi 的模型提供方调用，官方 OpenAI 使用 JSON Schema 输出，兼容供应商使用 JSON 解析和最多一次格式修复；成功候选另做独立裁判检查，参考 [OpenAI 官方结构化输出文档](https://developers.openai.com/api/docs/guides/structured-outputs)。兼容供应商修改 BASE_URL/MODEL 即可。
 
 ## Pi 游戏 Agent
 
@@ -166,13 +166,15 @@ Pi 的 `Agent.subscribe` 捕获工具开始/结束与自然语言文本增量；
 
 无模型 Key 时仍实例化真实 Pi Agent，由明确标注的本地规则模型流发出 tool calls，再由 SDK 调度五个工具；不是绕过 Runtime 的假 Agent。专项测试直接断言 `tool_execution_start/end` 与实际工具名。普通聊天没有链上写入；胜负签名依赖受信任后端，最终链上事实由合约事件确认。
 
+2026-10-17 真实模型验收使用 APIPod `deepseek-flash`：Alice 连续两轮、Bob 一轮，确认私有上下文隔离并实际执行全部五个游戏工具；生产默认流式配置也独立通过。随后通过公网 HTTPS 完成两轮真实聊天，玩家收到 26 个 `text_delta`，首段文字先于 HTTP 回复完成；公域观察者没有收到私有 Agent 事件，公开事件不含会话 token。`finish` 生成的 EIP-712 凭证恢复地址与链上 `resultSigner` 一致，挑战 ID、玩家、回合与域均受签名绑定。这些对话没有发起链上交易。脱敏证据见 `.local/evidence/ai-live-check.safe.json` 与 `.local/evidence/arena-live-production-http.json`。
+
 ## 前后端部署
 
 Next.js 部署到支持 Node 的平台；Fastify 部署到支持持续进程与 WebSocket 的 Node 主机。所有观众连接同一后端实例。不要把 Socket 服务放进短生命周期函数。
 
 ### 单服务 Render
 
-仓库提供 [render.yaml](render.yaml)。在 Render 创建 Blueprint 并关联本仓库，即可使用其构建和启动命令运行 Next.js、Fastify 与同域 WebSocket 网关。已填写公开合约地址和部署区块，平台只需安全配置 `ARENA_RESULT_SIGNER_PRIVATE_KEY`、`OPENAI_API_KEY` 两个服务端秘密变量；**不要上传 `.env.arena.local`，不要将部署钱包私钥加入 Web 服务**。本机同样可以在 `npm run build` 后运行 `npm run start:cloud`，默认网关端口 4100；托管平台使用其 `PORT`。
+仓库提供 [render.yaml](render.yaml)。在 Render 创建 Blueprint 并关联本仓库，即可使用其构建和启动命令运行 Next.js、Fastify 与同域 WebSocket 网关。已填写公开合约地址、部署区块、`AI_BASE_URL=https://api.apipod.ai/v1` 与 `AI_MODEL=deepseek-flash`，平台只需安全配置 `ARENA_RESULT_SIGNER_PRIVATE_KEY`、`AI_API_KEY` 两个服务端秘密变量；**不要上传 `.env.arena.local`，不要将部署钱包私钥加入 Web 服务**。本机同样可以在 `npm run build` 后运行 `npm run start:cloud`，默认网关端口 4100；托管平台使用其 `PORT`。
 
 该配置是部署入口，仓库中的配置文件不代表服务已经在 Render 托管。部署完成后核验公网 `/api/health`、玩家页面与大屏，再进行真实钱包结算。无钱包环境时不要声称已完成测试网游戏全流程。
 
@@ -219,7 +221,7 @@ Socket.IO `snapshot` + `game:event`：`eventId,type,timestamp,roundId,payload`�
 
 ## 已知限制
 
-- 合约已通过专用测试钱包部署，并完成一笔真实 10 MON 失败挑战结算；尚无真实测试网领奖记录。远程模型待 Key，固定托管待 Render 登录，临时公网地址依赖本机持续运行。
+- 合约已通过专用测试钱包部署，并完成一笔 Pi 本地规则模式的真实 10 MON 失败挑战结算；尚无真实测试网领奖记录。远程模型及其结果签名已单独验收，尚未用远程模型结果新增一笔收费结算。固定 Render 托管待账户验证，临时公网地址依赖本机持续运行。
 - 会话保存在单实例内存，重启需重开聊天；链上统计与预留奖励不丢失，公域状态可从链恢复。
 - 加入时钱包地址自报，在线钱包数是连接指标，不代表经签名认证的真人数；排行榜以实际链上地址为准。
 - 结算时付费，放弃对话不扣费也不计入链上挑战。服务端签名是可信裁判承诺，不是模型推理的去中心化证明。
