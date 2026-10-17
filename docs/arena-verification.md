@@ -67,7 +67,13 @@ Agent 只注册 `get_game_state`、`get_player_stats`、`get_recent_events`、`i
 
 此前浏览器回归包含五路由桌面/390px 手机、无钱包提示、自动进入 `/play` 和切换到 10143，7 组检查通过；测试提供者只模拟连接，不制造付款或确认。新版公网 `/play` 已通过 CUA DOM 核验：先付 10 MON、付款后计时、未付费时不显示聊天输入框，以及后台结算直达付款钱包、无独立领奖入口。旧页面截图不作为新版全流程凭证。
 
-临时入口：[玩家](https://dresses-brad-saints-cap.trycloudflare.com/play) · [大屏](https://dresses-brad-saints-cap.trycloudflare.com/arena)。新版页面已更新并完成上述 DOM、截图和控制台错误核验（未发现控制台错误）；此前五页面 200、健康检查 ready / aiMode live、真实交易 API 与 WebSocket 快照也有独立记录。地址依赖本机与隧道持续运行；Render 固定站点 https://monad-rug-arena.onrender.com 已上线旧版，实读 `/api/health` 仍指向旧合约，预付费新版待另一会话更新云端代码和公开合约配置；Docker 配置已准备但未宣称实测容器。
+固定云端：[玩家](https://monad-rug-arena.onrender.com/play) · [大屏](https://monad-rug-arena.onrender.com/arena) · [排行榜](https://monad-rug-arena.onrender.com/leaderboard)。前后端与 Socket.IO 在同一 Render 免费服务运行，使用当前预付费合约，不依赖本机或临时隧道。代码版本 `2ab9ece` 包含已测试的钱包检测与手机钱包入口修复。秘密变量只保存在后端；Docker 配置另行提供，未宣称实测容器。
+
+Render 服务 ID：`srv-db9j30rrjlhs73f14ic0`。部署源为公开 Git 仓库，后续推送需手动部署最新提交；免费实例闲置后会休眠，现场先打开大屏预热。最新云端核心实测及交易链接见[云部署记录](../deployments/render.json)。
+
+2026-10-17 17:07（Asia/Shanghai），固定云服务 `2ab9ece` 已完成一场核心实测：先付 10 MON（[入场交易](https://testnet.monadscan.com/tx/0xcc44698ded646e72da54c95481764b8a63de81b48ccfa8cbaa85434c4110084c)），Pi 实际执行三个工具并发出 20 段私有文本增量；后台签名、支付结算 Gas 并[自动结算](https://testnet.monadscan.com/tx/0xc0e5d70dd9dae0e3b7a6977d3f290148444445abd1698376f3a28a65c95d00b9)。本场失败计 10 分，奖励 0；玩家 nonce 仅入场增加一次，聊天和结算不要求再次发交易。真实大屏更新为奖池 12 MON、总挑战 2、该玩家 1 胜 / 110 分。
+
+这场第二条消息出现可恢复的模型错误，未扣消息次数；随后主动结束同一已付挑战，没有再付第二场。云端这次验证不声称产生新的成功奖金，成功自动 4 MON 发奖由上面的独立测试网实测证明。按最快核心演示范围完成后，不再追加边缘回归。
 
 网页读取连接玩家自己的地址和测试网余额。注入钱包无需 Reown 项目；普通移动浏览器的 WalletConnect 仍待配置 `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` 和真实域名白名单。公共变量由启动器转交构建，修改后须重新构建、重启网页。
 

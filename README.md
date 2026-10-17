@@ -13,8 +13,9 @@
 - 预付费版 `RugArena.sol` 已部署 Monad Testnet；前后端代码、合约测试、构建、部署脚本与 Docker/Render 配置齐全。
 - 合约 **55/55**、后端 **17/17**、Pi Agent **9/9** 测试通过；双钱包真实本地 EVM 全流程、类型检查与生产构建通过。
 - **新版真实测试网全流程已通过**：先付 10 MON，真实 Pi 远程模型在第 2 条对话判定成功，后台代付结算 Gas，4 MON 直接转入原付款钱包；重复结束请求没有新交易。
+- **固定云端核心已跑通**：[10 MON 入场](https://testnet.monadscan.com/tx/0xcc44698ded646e72da54c95481764b8a63de81b48ccfa8cbaa85434c4110084c) → 真实 Pi 工具与流式回复 → [后台自动结算](https://testnet.monadscan.com/tx/0xc0e5d70dd9dae0e3b7a6977d3f290148444445abd1698376f3a28a65c95d00b9)。本场失败获 10 分，奖池快照 12 MON；[云部署记录](deployments/render.json) 与前述成功派奖分开记录。
 
-临时演示：[玩家入口](https://dresses-brad-saints-cap.trycloudflare.com/play) · [现场大屏](https://dresses-brad-saints-cap.trycloudflare.com/arena)。新版 `/play` 已核验预付 10 MON 门槛、付款后计时和无独立领奖入口。地址依赖本机服务和隧道持续运行；**Render 固定站点已上线旧版，预付费新版仍待云端切换**。详细证据见[验收记录](docs/arena-verification.md)。
+固定云端：[玩家入口](https://monad-rug-arena.onrender.com/play) · [现场大屏](https://monad-rug-arena.onrender.com/arena) · [排行榜](https://monad-rug-arena.onrender.com/leaderboard)。前后端部署到同一个 Render 免费服务，不依赖本机或临时隧道。玩家先付 10 MON，付款确认后计时、开放聊天，成功自动到账。详细证据见[验收记录](docs/arena-verification.md)。
 
 | 当前预付费合约 | 真实 Monad Testnet 记录 |
 | --- | --- |
@@ -108,9 +109,11 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=你的ReownProjectID
 
 ### 钱包连接与 Reown
 
-浏览器扩展或钱包内置浏览器可直接连接玩家自己的 EVM 钱包。普通手机浏览器的跨应用连接需要在 [Reown 控制台](https://dashboard.reown.com/)创建项目，将 Project ID 填入上述 `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`，并把实际游戏公网域名加入项目白名单；玩家无需各自申请 ID。参考[官方设置说明](https://docs.reown.com/appkit/overview)。
+连接按钮先检测已安装的 MetaMask、Rabby 等 EVM 钱包：仅一个钱包时直接连接，并请求切换到 Monad Testnet；有多个钱包时选择自己的钱包。没有扩展时显示连接弹窗，可一键用 MetaMask / Trust Wallet App 打开当前游戏，也可扫码或复制游戏链接，在钱包内授权连接后只确认一次 10 MON 入场付款。打开钱包的链接只包含当前网站的 `/play` 地址，不携带挑战 token 或私钥。
 
-启动器会从 `.env.arena.local` 向前端构建转交 `NEXT_PUBLIC_*` 公开值。**Project ID、RPC 或 API 公共地址变更后，需要重新构建并重启网页服务**，仅重启旧产物不会更新 WalletConnect。当前 Reown 项目配置尚待完成；这不妨碍注入钱包连接与合约流程。
+如需留在普通浏览器内通过 WalletConnect 配对手机钱包，则在 [Reown 控制台](https://dashboard.reown.com/)创建项目，将 Project ID 填入上述 `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`，并把实际游戏公网域名加入项目白名单；玩家无需各自申请 ID。参考[官方设置说明](https://docs.reown.com/appkit/overview)。
+
+启动器会从 `.env.arena.local` 向前端构建转交 `NEXT_PUBLIC_*` 公开值。**Project ID、RPC 或 API 公共地址变更后，需要重新构建并重启网页服务**，仅重启旧产物不会更新 WalletConnect。当前 Reown 项目配置尚待完成；未配置时不显示不可用的 WalletConnect 选项，玩家可直接用钱包 App 打开游戏参与。
 
 ## 测试与构建
 
@@ -182,7 +185,9 @@ APIPod 真实模型、全部五工具、两玩家上下文隔离与私有流式�
 
 将 `AI_API_KEY`、`ARENA_RESULT_SIGNER_PRIVATE_KEY` 保存为平台后端秘密变量；WalletConnect Project ID 是构建时公开变量。不要上传整个 `.env.arena.local`，不要注入部署钱包私钥。若需持久化私有会话，将 `ARENA_SESSION_STORE_PATH` 指向持久化目录。
 
-本机同样可执行 `npm run build`、`npm run start:cloud`，默认网关 4100，内部前端 3150、后端 4000。[Render 固定站点](https://monad-rug-arena.onrender.com) 已上线旧版（仍使用旧合约）；预付费新版的代码和两个公开合约配置由另一会话更新，切换前请使用上面的临时演示地址。切换后检查 `/api/health` 的 `ready`、`chainId: 10143`、`aiMode: live` 与 relayer 状态，再验收真实预付费与自动发奖。
+本机同样可执行 `npm run build`、`npm run start:cloud`，默认网关 4100，内部前端 3150、后端 4000。[Render 固定站点](https://monad-rug-arena.onrender.com) 使用当前预付费合约，`ARENA_CONTRACT_ADDRESS` 为上表新地址、`ARENA_DEPLOYMENT_BLOCK=71772830`，模型 Key 和裁判密钥只保存在后端秘密变量中。健康检查 `/api/health` 应为 `ready`、`chainId: 10143`、`aiMode: live`、`agentRuntime: pi-agent-core` 和 `relayer.ready: true`。
+
+当前服务通过公开 Git 仓库创建，后续推送后需在 Render 点击 **Manual Deploy → Deploy latest commit**；`render.yaml` 是配置模板，不会自动改写手工创建服务的环境变量。免费实例闲置后会休眠，首次打开可能等待约一分钟；现场演示前先打开大屏。
 
 ### 临时公网演示
 
@@ -234,8 +239,9 @@ docker compose --env-file .env.arena.local up --build -d
 
 - 当前为单实例黑客松原型。私有会话保存到被 Git 忽略的 `.local/arena-sessions.json`；同文件恢复可继续付费场次。Render 免费实例的临时磁盘在重建后可能丢失，稳定公开演示需要持久化目录；链上付款、奖池和战绩不会因此丢失。
 - 可信后台负责 AI 判定、签名及结算 Gas；不是零知识或完全去中心化验证。后台 Gas 不足会暂停接受新挑战，应在演示前检查 relayer 余额。
-- 当前 Reown Project ID 仍待配置；注入钱包可用，普通移动浏览器跨应用连接待完成项目与域名白名单。
-- 当前预付费版临时公网依赖本机持续运行；Render 固定站点仍待升级到本版合约和代码。新版真实模型、预付费与自动发奖已完成一场实测，旧版交易不作为新版证据。
+- 模型供应商偶发错误可重试，不消耗消息次数；固定云端实测第二条消息遇到一次该错误，随后在同场主动结束并完成自动结算，未重复付费。
+- 当前 Reown Project ID 仍待配置；扩展钱包、钱包 App 内的连接及支付可用，普通浏览器内的 WalletConnect 配对待项目与域名白名单配置。手机 App 唤起仍取决于系统与已安装的钱包，未安装时可通过官方链接安装。
+- Render 固定站点已使用当前预付费版；免费实例闲置后会休眠。临时隧道仅供本机排练，旧版交易不作为新版证据。
 - 在线钱包数为连接指标，不是经签名认证的真人数量；排行榜与奖励以实际付款地址为准。
 - 演示以一笔真实回执确认，未实现复杂重组恢复；部署区块需配置准确。参数不可变，20% 留存余额没有运营提现接口。
 - 没有主网、ERC-20、质押、市场、账户抽象、自建钱包或正式资产管理。旧 x402 示例保留但不参与当前游戏，见[旧说明](docs/legacy-x402-readme.md)。

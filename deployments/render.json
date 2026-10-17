@@ -1,0 +1,40 @@
+{
+  "status": "live",
+  "verifiedAt": "2026-10-17T09:07:39.638Z",
+  "origin": "https://monad-rug-arena.onrender.com",
+  "playUrl": "https://monad-rug-arena.onrender.com/play",
+  "arenaUrl": "https://monad-rug-arena.onrender.com/arena",
+  "serviceId": "srv-db9j30rrjlhs73f14ic0",
+  "deployId": "dep-db9jjb3rjlhs73f2nu4g",
+  "sourceCommit": "2ab9eceddaf428b13274c096fdde5fd86cfbb0b6",
+  "plan": "free",
+  "protocol": "prepaid-auto-payout",
+  "chainId": 10143,
+  "contractAddress": "0x27D86752d07FFbdd2BBDE9d2cF91Ef2B69b04552",
+  "deploymentBlock": "71772830",
+  "agentRuntime": "pi-agent-core",
+  "modelProvider": "APIPod",
+  "model": "deepseek-flash",
+  "health": { "status": "ready", "aiMode": "live", "relayerReady": true },
+  "cloudChallenge": {
+    "challengeId": "0xa1831f69da15772e9909cf02cad95d4653399b48366acefb7152080b75f742b8",
+    "feeWei": "10000000000000000000",
+    "entryHash": "0xcc44698ded646e72da54c95481764b8a63de81b48ccfa8cbaa85434c4110084c",
+    "entryBlock": "71781260",
+    "settlementHash": "0xc0e5d70dd9dae0e3b7a6977d3f290148444445abd1698376f3a28a65c95d00b9",
+    "settlementBlock": "71781350",
+    "success": false,
+    "score": "10",
+    "rewardWei": "0",
+    "playerTransactions": 1,
+    "settlementGasPaidByBackend": true,
+    "toolsExecuted": ["get_game_state", "inspect_vault", "judge_challenge"],
+    "privateTextDeltas": 20,
+    "publicPrizePoolWeiAfterTest": "12000000000000000000"
+  },
+  "limitations": [
+    "The second cloud message returned a recoverable AI provider error without consuming a message. The same paid challenge was then finished and automatically settled as failure; no second entry was paid.",
+    "This cloud test proves real Pi dialogue and automatic settlement, not a new winning payout. The earlier live test on this same contract separately proves automatic 4 MON payout; see monad-testnet-smoke.json.",
+    "The free service can sleep after inactivity and uses ephemeral session storage. Public-repository deployments require Manual Deploy after code changes."
+  ]
+}
